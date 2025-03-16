@@ -1,0 +1,289 @@
+{% extends 'base.html' %}
+
+{% block title %}Ana Sayfa - Anlık Haber{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title mb-4">Anlık Haber Yönetim Paneli</h2>
+                <p class="lead">Bu panel, en güncel haberleri otomatik olarak Instagram'da paylaşan sistemi yönetmenizi sağlar.</p>
+                
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-tasks me-2"></i>Haber İşlemleri</h5>
+                                <p class="card-text">Haberleri çekme, özetleme, görsel bulma ve işleme adımlarını tek seferde çalıştırın.</p>
+                                <form action="{{ url_for('pipeline_calistir') }}" method="post">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-play me-1"></i>Tüm İşlemleri Çalıştır
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-clock me-2"></i>Otomatik Çalışma</h5>
+                                <p class="card-text">Sistemi belirli aralıklarla otomatik olarak çalıştırmak için scheduler'ı başlatın.</p>
+                                <form action="{{ url_for('scheduler_baslat') }}" method="post">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-play-circle me-1"></i>Scheduler'ı Başlat
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-newspaper me-2"></i>Haberler</h5>
+                                <p class="card-text">Tüm haberleri görüntüleyin, düzenleyin ve yönetin.</p>
+                                <a href="{{ url_for('haberler') }}" class="btn btn-info">
+                                    <i class="fas fa-list me-1"></i>Haberleri Görüntüle
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-cog me-2"></i>Ayarlar</h5>
+                                <p class="card-text">Sistem ayarlarını yapılandırın ve özelleştirin.</p>
+                                <a href="{{ url_for('ayarlar') }}" class="btn btn-secondary">
+                                    <i class="fas fa-cogs me-1"></i>Ayarları Düzenle
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="fas fa-toggle-on me-2"></i>Otomatik Paylaşım Kontrolü</h5>
+                                <p class="card-text">Haberlerin otomatik olarak Instagram'da paylaşılmasını kontrol edin.</p>
+                                
+                                <form action="{{ url_for('otomatik_paylasim_durum') }}" method="post" class="d-flex align-items-center">
+                                    <div class="form-check form-switch me-3">
+                                        <input class="form-check-input" type="checkbox" id="otomatikPaylasimSwitch" name="durum" value="true" {% if otomatik_paylasim_aktif %}checked{% endif %} onchange="this.form.submit()">
+                                        <label class="form-check-label" for="otomatikPaylasimSwitch">
+                                            {% if otomatik_paylasim_aktif %}
+                                                <span class="text-success">Otomatik paylaşım aktif</span>
+                                            {% else %}
+                                                <span class="text-danger">Otomatik paylaşım devre dışı</span>
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">
+                                        {% if otomatik_paylasim_aktif %}
+                                            Haberler otomatik olarak Instagram'da paylaşılacak.
+                                        {% else %}
+                                            Haberler paylaşıma hazır olarak işaretlenecek, ancak otomatik paylaşılmayacak.
+                                        {% endif %}
+                                    </small>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Sistem Bilgileri</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Toplam Haber Sayısı
+                        <span class="badge bg-primary rounded-pill" id="toplam-haber">Yükleniyor...</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Paylaşılan Haber Sayısı
+                        <span class="badge bg-success rounded-pill" id="paylasilan-haber">Yükleniyor...</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Paylaşıma Hazır Haber Sayısı
+                        <span class="badge bg-warning rounded-pill" id="paylasima-hazir-haber">Yükleniyor...</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Bekleyen Haber Sayısı
+                        <span class="badge bg-secondary rounded-pill" id="bekleyen-haber">Yükleniyor...</span>
+                    </li>
+                </ul>
+                
+                <div class="mt-3">
+                    <h6><i class="fas fa-history me-2"></i>Son İşlemler</h6>
+                    <div class="list-group" id="son-islemler">
+                        <div class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Veriler yükleniyor...</h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i>Hızlı Yardım</h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="accordionHelp">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingOne">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne">
+                                Nasıl Başlarım?
+                            </button>
+                        </h2>
+                        <div id="collapseOne" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+                            <div class="accordion-body">
+                                <p>Başlamak için "Tüm İşlemleri Çalıştır" butonuna tıklayın. Bu, haberleri çekecek, özetleyecek, görselleri bulacak ve işleyecektir.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingTwo">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo">
+                                Otomatik Çalışma Nasıl Ayarlanır?
+                            </button>
+                        </h2>
+                        <div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+                            <div class="accordion-body">
+                                <p>"Scheduler'ı Başlat" butonuna tıklayarak sistemi otomatik çalışma moduna alabilirsiniz. Sistem, belirtilen aralıklarla haberleri kontrol edecek ve işleyecektir.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingThree">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree">
+                                Ayarları Nasıl Değiştirebilirim?
+                            </button>
+                        </h2>
+                        <div id="collapseThree" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+                            <div class="accordion-body">
+                                <p>"Ayarları Düzenle" butonuna tıklayarak sistem ayarlarını değiştirebilirsiniz. Burada kontrol aralığı, API anahtarları ve diğer ayarları yapılandırabilirsiniz.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingFour">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFour">
+                                Otomatik Paylaşımı Nasıl Kontrol Ederim?
+                            </button>
+                        </h2>
+                        <div id="collapseFour" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+                            <div class="accordion-body">
+                                <p>Otomatik paylaşım kontrolü bölümündeki düğmeyi kullanarak paylaşımları açıp kapatabilirsiniz. Kapalı olduğunda, haberler paylaşıma hazır olarak işaretlenir ancak otomatik olarak paylaşılmaz.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Sistem bilgilerini yükle
+    function loadSystemInfo() {
+        fetch('/api/haberler?per_page=1')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('toplam-haber').textContent = data.toplam || 0;
+                
+                // Paylaşılan ve bekleyen haber sayılarını hesapla
+                if (data.toplam && data.toplam > 0) {
+                    fetch('/api/haberler?per_page=' + data.toplam)
+                        .then(response => response.json())
+                        .then(fullData => {
+                            let paylasilan = 0;
+                            let paylasima_hazir = 0;
+                            
+                            if (fullData.haberler && fullData.haberler.length > 0) {
+                                fullData.haberler.forEach(haber => {
+                                    if (haber.paylasildi) {
+                                        paylasilan++;
+                                    } else if (haber.paylasima_hazir) {
+                                        paylasima_hazir++;
+                                    }
+                                });
+                            }
+                            
+                            document.getElementById('paylasilan-haber').textContent = paylasilan;
+                            document.getElementById('paylasima-hazir-haber').textContent = paylasima_hazir;
+                            document.getElementById('bekleyen-haber').textContent = data.toplam - paylasilan - paylasima_hazir;
+                            
+                            // Son işlemleri göster
+                            const sonIslemlerDiv = document.getElementById('son-islemler');
+                            sonIslemlerDiv.innerHTML = '';
+                            
+                            // En son 5 haberi göster
+                            const sonHaberler = fullData.haberler ? fullData.haberler.slice(0, 5) : [];
+                            
+                            if (sonHaberler.length === 0) {
+                                sonIslemlerDiv.innerHTML = '<div class="list-group-item">Henüz işlem yapılmamış.</div>';
+                            } else {
+                                sonHaberler.forEach(haber => {
+                                    const tarih = new Date(haber.olusturulma_zamani);
+                                    const formattedDate = tarih.toLocaleDateString('tr-TR') + ' ' + tarih.toLocaleTimeString('tr-TR');
+                                    
+                                    let statusBadge = '';
+                                    if (haber.paylasildi) {
+                                        statusBadge = '<span class="badge bg-success">Paylaşıldı</span>';
+                                    } else if (haber.paylasima_hazir) {
+                                        statusBadge = '<span class="badge bg-warning">Paylaşıma Hazır</span>';
+                                    } else if (haber.islenmis_gorsel_path) {
+                                        statusBadge = '<span class="badge bg-info">İşlendi</span>';
+                                    } else if (haber.gorsel_url) {
+                                        statusBadge = '<span class="badge bg-primary">Görsel Bulundu</span>';
+                                    } else if (haber.ozet) {
+                                        statusBadge = '<span class="badge bg-primary">Özetlendi</span>';
+                                    } else {
+                                        statusBadge = '<span class="badge bg-secondary">Yeni</span>';
+                                    }
+                                    
+                                    sonIslemlerDiv.innerHTML += `
+                                        <a href="/haber/${haber.id}" class="list-group-item list-group-item-action">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">${haber.baslik.substring(0, 30)}${haber.baslik.length > 30 ? '...' : ''}</h6>
+                                                ${statusBadge}
+                                            </div>
+                                            <small class="text-muted">${formattedDate}</small>
+                                        </a>
+                                    `;
+                                });
+                            }
+                        });
+                }
+            })
+            .catch(error => {
+                console.error('Sistem bilgileri yüklenirken hata oluştu:', error);
+            });
+    }
+    
+    // Sayfa yüklendiğinde sistem bilgilerini yükle
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSystemInfo();
+        
+        // Her 30 saniyede bir güncelle
+        setInterval(loadSystemInfo, 30000);
+    });
+</script>
+{% endblock %} 

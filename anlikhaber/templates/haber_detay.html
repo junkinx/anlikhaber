@@ -1,0 +1,658 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ haber.baslik }} - Anlık Haber{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+<style>
+    .image-container {
+        position: relative;
+        margin-bottom: 20px;
+        max-width: 100%;
+        overflow: hidden;
+    }
+    
+    .focal-point {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        background-color: red;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        cursor: move;
+        z-index: 100;
+    }
+    
+    .focal-point-container {
+        position: relative;
+        margin: 0 auto;
+        max-width: 100%;
+        overflow: hidden;
+    }
+    
+    .focal-point-image {
+        max-width: 100%;
+        display: block;
+    }
+    
+    .focal-inputs {
+        margin-bottom: 15px;
+    }
+    
+    .focal-inputs .form-control {
+        width: 80px;
+        display: inline-block;
+        margin-right: 10px;
+    }
+    
+    .focal-inputs label {
+        margin-right: 5px;
+    }
+    
+    .processing-status {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    
+    .status-waiting {
+        background-color: #fff3cd;
+        border: 1px solid #ffecb5;
+    }
+    
+    .status-processing {
+        background-color: #cff4fc;
+        border: 1px solid #b6effb;
+    }
+    
+    .status-completed {
+        background-color: #d1e7dd;
+        border: 1px solid #badbcc;
+    }
+    
+    .status-error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c2c7;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-newspaper me-2"></i>Haber Detayı</h5>
+                <a href="{{ url_for('haberler') }}" class="btn btn-sm btn-light">
+                    <i class="fas fa-arrow-left me-1"></i>Haberlere Dön
+                </a>
+            </div>
+            <div class="card-body">
+                <h2 class="card-title mb-3">{{ haber.baslik }}</h2>
+                
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">
+                        <i class="fas fa-newspaper me-1"></i>{{ haber.kaynak }}
+                    </span>
+                    <span class="text-muted">
+                        <i class="far fa-calendar-alt me-1"></i>{{ haber.olusturulma_zamani.strftime('%d.%m.%Y %H:%M') }}
+                    </span>
+                </div>
+                
+                {% if haber.ozet %}
+                    <div class="alert alert-primary">
+                        <h5><i class="fas fa-file-alt me-2"></i>Özet</h5>
+                        <p class="mb-0">{{ haber.ozet }}</p>
+                    </div>
+                {% endif %}
+                
+                <h5 class="mt-4"><i class="fas fa-align-left me-2"></i>İçerik</h5>
+                <div class="border p-3 rounded bg-light">
+                    <p>{{ haber.icerik }}</p>
+                </div>
+                
+                <div class="mt-3">
+                    <a href="{{ haber.url }}" target="_blank" class="btn btn-outline-primary">
+                        <i class="fas fa-external-link-alt me-1"></i>Kaynağa Git
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>İşlemler</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if not haber.ozet %}
+                        <form action="{{ url_for('haber_ozetle', haber_id=haber.id) }}" method="post">
+                            <button type="submit" class="btn btn-primary w-100 mb-2">
+                                <i class="fas fa-file-alt me-1"></i>Haberi Özetle
+                            </button>
+                        </form>
+                    {% endif %}
+                    
+                    {% if not haber.gorsel_url %}
+                        <form action="{{ url_for('haber_gorsel_bul', haber_id=haber.id) }}" method="post">
+                            <button type="submit" class="btn btn-warning w-100 mb-2">
+                                <i class="fas fa-image me-1"></i>Görsel Bul
+                            </button>
+                        </form>
+                    {% endif %}
+                    
+                    {% if haber.gorsel_url and not haber.islenmis_gorsel_path %}
+                        <form action="{{ url_for('haber_gorselini_isle', haber_id=haber.id) }}" method="post">
+                            <button type="submit" class="btn btn-info w-100 mb-2">
+                                <i class="fas fa-crop me-1"></i>Görseli İşle
+                            </button>
+                        </form>
+                    {% endif %}
+                    
+                    {% if haber.gorsel_url and haber.islenmis_gorsel_path %}
+                        <button type="button" class="btn btn-info w-100 mb-2" data-bs-toggle="modal" data-bs-target="#gorselYenidenIsleModal">
+                            <i class="fas fa-crop-alt me-1"></i>Görseli Yeniden İşle
+                        </button>
+                    {% endif %}
+                    
+                    {% if haber.islenmis_gorsel_path and haber.ozet and not haber.paylasima_hazir and not haber.paylasildi %}
+                        <form action="{{ url_for('haber_paylasima_hazirla', haber_id=haber.id) }}" method="post">
+                            <button type="submit" class="btn btn-warning w-100 mb-2">
+                                <i class="fas fa-check-circle me-1"></i>Paylaşıma Hazırla
+                            </button>
+                        </form>
+                    {% endif %}
+                    
+                    {% if haber.paylasima_hazir and not haber.paylasildi %}
+                        <form action="{{ url_for('haber_paylasima_hazir_iptal', haber_id=haber.id) }}" method="post">
+                            <button type="submit" class="btn btn-outline-warning w-100 mb-2">
+                                <i class="fas fa-times-circle me-1"></i>Paylaşıma Hazır İptal
+                            </button>
+                        </form>
+                    {% endif %}
+                    
+                    {% if haber.islenmis_gorsel_path and not haber.paylasildi %}
+                        <form action="{{ url_for('haber_paylas', haber_id=haber.id) }}" method="post">
+                            <button type="submit" class="btn btn-success w-100 mb-2">
+                                <i class="fab fa-instagram me-1"></i>Instagram'da Paylaş
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Durum Bilgisi</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Özet
+                        {% if haber.ozet %}
+                            <span class="badge bg-success rounded-pill"><i class="fas fa-check"></i></span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill"><i class="fas fa-times"></i></span>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Görsel URL
+                        {% if haber.gorsel_url %}
+                            <span class="badge bg-success rounded-pill"><i class="fas fa-check"></i></span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill"><i class="fas fa-times"></i></span>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        İşlenmiş Görsel
+                        {% if haber.islenmis_gorsel_path %}
+                            <span class="badge bg-success rounded-pill"><i class="fas fa-check"></i></span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill"><i class="fas fa-times"></i></span>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Paylaşıma Hazır
+                        {% if haber.paylasima_hazir %}
+                            <span class="badge bg-success rounded-pill"><i class="fas fa-check"></i></span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill"><i class="fas fa-times"></i></span>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Instagram'da Paylaşıldı
+                        {% if haber.paylasildi %}
+                            <span class="badge bg-success rounded-pill"><i class="fas fa-check"></i></span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill"><i class="fas fa-times"></i></span>
+                        {% endif %}
+                    </li>
+                </ul>
+                
+                {% if haber.paylasilma_zamani %}
+                    <div class="alert alert-success mt-3 mb-0">
+                        <i class="fas fa-calendar-check me-1"></i>Paylaşılma Zamanı: {{ haber.paylasilma_zamani.strftime('%d.%m.%Y %H:%M') }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if haber.gorsel_url %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-image me-2"></i>Orijinal Görsel</h5>
+                </div>
+                <div class="card-body text-center">
+                    {% if haber.orijinal_gorsel_path %}
+                        <img src="{{ url_for('static', filename=haber.orijinal_gorsel_path.replace(url_for('static', filename=''), '')) }}" alt="{{ haber.baslik }}" class="img-fluid rounded" id="orijinalGorsel">
+                    {% else %}
+                        {% if 'iasbh.tmgrup.com.tr' in haber.gorsel_url and 'u=' in haber.gorsel_url %}
+                            {% set gercek_url = haber.gorsel_url.split('u=')[1] %}
+                            {% if '?' in gercek_url %}
+                                {% set gercek_url = gercek_url.split('?')[0] %}
+                            {% endif %}
+                            <img src="{{ gercek_url }}" alt="{{ haber.baslik }}" class="img-fluid rounded" id="orijinalGorsel">
+                        {% elif '?' in haber.gorsel_url %}
+                            <img src="{{ haber.gorsel_url.split('?')[0] }}" alt="{{ haber.baslik }}" class="img-fluid rounded" id="orijinalGorsel">
+                        {% else %}
+                            <img src="{{ haber.gorsel_url }}" alt="{{ haber.baslik }}" class="img-fluid rounded" id="orijinalGorsel">
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+        
+        {% if haber.islenmis_gorsel_path %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-image me-2"></i>İşlenmiş Görsel</h5>
+                </div>
+                <div class="card-body text-center">
+                    <img src="{{ url_for('static', filename=haber.islenmis_gorsel_path.replace(url_for('static', filename=''), '')) }}" alt="{{ haber.baslik }}" class="img-fluid rounded">
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Görseli Yeniden İşle Modal -->
+{% if haber.gorsel_url and haber.islenmis_gorsel_path %}
+<div class="modal fade" id="gorselYenidenIsleModal" tabindex="-1" aria-labelledby="gorselYenidenIsleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="gorselYenidenIsleModalLabel"><i class="fas fa-crop-alt me-2"></i>Görseli Yeniden İşle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="position-relative">
+                            <div id="gorselContainer" class="position-relative">
+                                {% if haber.orijinal_gorsel_path %}
+                                    <img src="{{ url_for('static', filename=haber.orijinal_gorsel_path.replace(url_for('static', filename=''), '')) }}" alt="{{ haber.baslik }}" class="img-fluid rounded" id="modalOrijinalGorsel">
+                                {% else %}
+                                    {% if 'iasbh.tmgrup.com.tr' in haber.gorsel_url and 'u=' in haber.gorsel_url %}
+                                        {% set gercek_url = haber.gorsel_url.split('u=')[1] %}
+                                        {% if '?' in gercek_url %}
+                                            {% set gercek_url = gercek_url.split('?')[0] %}
+                                        {% endif %}
+                                        <img src="{{ gercek_url }}" alt="{{ haber.baslik }}" class="img-fluid rounded" id="modalOrijinalGorsel">
+                                    {% elif '?' in haber.gorsel_url %}
+                                        <img src="{{ haber.gorsel_url.split('?')[0] }}" alt="{{ haber.baslik }}" class="img-fluid rounded" id="modalOrijinalGorsel">
+                                    {% else %}
+                                        <img src="{{ haber.gorsel_url }}" alt="{{ haber.baslik }}" class="img-fluid rounded" id="modalOrijinalGorsel">
+                                    {% endif %}
+                                {% endif %}
+                                <div id="selectionBox" class="position-absolute" style="border: 2px dashed red; background-color: rgba(255,0,0,0.1); cursor: move; display: none;"></div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-2">
+                            <small class="text-muted">Görselin işlenecek alanını seçmek için tıklayıp sürükleyin veya kırmızı kutuyu taşıyın</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <form id="gorselYenidenIsleForm" action="{{ url_for('haber_gorselini_yeniden_isle', haber_id=haber.id) }}" method="post">
+                            <div class="mb-3">
+                                <label for="odakX" class="form-label">Yatay Odak Noktası (0-1)</label>
+                                <input type="number" class="form-control" id="odakX" name="odakX" min="0" max="1" step="0.01" value="0.5" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="odakY" class="form-label">Dikey Odak Noktası (0-1)</label>
+                                <input type="number" class="form-control" id="odakY" name="odakY" min="0" max="1" step="0.01" value="0.5" readonly>
+                            </div>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>Odak noktası değerleri, seçtiğiniz alana göre otomatik hesaplanır.
+                            </div>
+                            <button type="submit" class="btn btn-primary">Görseli Yeniden İşle</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Görsel İşlemleri Modal -->
+<div class="modal fade" id="islemlerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Görsel İşlemleri</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-grid gap-2">
+                    <form action="{{ url_for('haber_gorselini_isle', haber_id=haber.id) }}" method="POST">
+                        <button type="submit" class="btn btn-primary w-100 mb-2">
+                            <i class="fas fa-image"></i> Görseli İşle
+                        </button>
+                    </form>
+                    
+                    <button type="button" class="btn btn-info w-100 mb-2" data-bs-toggle="modal" data-bs-target="#odakNoktasiModal">
+                        <i class="fas fa-crosshairs"></i> Odak Noktasını Ayarla
+                    </button>
+                    
+                    {% if haber.islenmis_gorsel_path %}
+                    <a href="{{ url_for('static', filename=haber.islenmis_gorsel_path.replace('static/', '')) }}" download class="btn btn-success w-100 mb-2">
+                        <i class="fas fa-download"></i> İşlenmiş Görseli İndir
+                    </a>
+                    {% endif %}
+                </div>
+                
+                <div id="islemDurumu" class="processing-status mt-3 d-none">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status" id="islemSpinner"></div>
+                        <span id="islemMesaji">İşleniyor...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Odak Noktası Modal -->
+<div class="modal fade" id="odakNoktasiModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Odak Noktasını Ayarla</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Görselin odak noktasını ayarlamak için kırmızı noktayı sürükleyin veya koordinatları manuel olarak girin.</p>
+                
+                <div class="focal-inputs d-flex align-items-center mb-3">
+                    <label for="odakX">X:</label>
+                    <input type="number" id="odakX" class="form-control" min="0" max="1" step="0.01" value="0.5">
+                    
+                    <label for="odakY" class="ms-3">Y:</label>
+                    <input type="number" id="odakY" class="form-control" min="0" max="1" step="0.01" value="0.5">
+                    
+                    <span class="text-muted ms-3">(0-1 arası değerler)</span>
+                </div>
+                
+                <div class="focal-point-container">
+                    {% if haber.orijinal_gorsel_path %}
+                    <img src="{{ url_for('static', filename=haber.orijinal_gorsel_path.replace('static/', '')) }}" class="focal-point-image" id="odakResim" alt="Odak Noktası Ayarı">
+                    {% elif haber.gorsel_url %}
+                        {% if 'iasbh.tmgrup.com.tr' in haber.gorsel_url and 'u=' in haber.gorsel_url %}
+                            {% set gercek_url = haber.gorsel_url.split('u=')[1] %}
+                            {% if '?' in gercek_url %}
+                                {% set gercek_url = gercek_url.split('?')[0] %}
+                            {% endif %}
+                            <img src="{{ gercek_url }}" class="focal-point-image" id="odakResim" alt="Odak Noktası Ayarı">
+                        {% elif '?' in haber.gorsel_url %}
+                            <img src="{{ haber.gorsel_url.split('?')[0] }}" class="focal-point-image" id="odakResim" alt="Odak Noktası Ayarı">
+                        {% else %}
+                            <img src="{{ haber.gorsel_url }}" class="focal-point-image" id="odakResim" alt="Odak Noktası Ayarı">
+                        {% endif %}
+                    {% endif %}
+                    <div class="focal-point" id="odakNoktasi"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" class="btn btn-primary" id="odakNoktasiKaydet">Kaydet ve İşle</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Silme Onay Modal -->
+<div class="modal fade" id="silModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Haberi Sil</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bu haberi silmek istediğinizden emin misiniz?</p>
+                <p class="text-danger"><strong>{{ haber.baslik }}</strong></p>
+                <p class="text-muted small">Bu işlem geri alınamaz.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <form action="{{ url_for('haber_sil', haber_id=haber.id) }}" method="POST">
+                    <button type="submit" class="btn btn-danger">Evet, Sil</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // Görsel seçim kutusu için değişkenler
+        const modalOrijinalGorsel = $("#modalOrijinalGorsel");
+        const selectionBox = $("#selectionBox");
+        const gorselContainer = $("#gorselContainer");
+        const odakX = $("#odakX");
+        const odakY = $("#odakY");
+        
+        let isSelecting = false;
+        let startX, startY;
+        let targetRatio = 1080 / 1350; // Hedef görsel oranı (1080x1350)
+        
+        // Görsel yüklendiğinde
+        modalOrijinalGorsel.on('load', function() {
+            // Görsel boyutlarını al
+            const imgWidth = modalOrijinalGorsel.width();
+            const imgHeight = modalOrijinalGorsel.height();
+            
+            // Görsel oranını hesapla
+            const imgRatio = imgWidth / imgHeight;
+            
+            // Seçim kutusunun boyutlarını hesapla
+            let boxWidth, boxHeight;
+            
+            if (imgRatio > targetRatio) {
+                // Yatay görsel
+                boxHeight = Math.min(imgHeight, 300); // Maksimum 300px yükseklik
+                boxWidth = boxHeight * targetRatio;
+            } else {
+                // Dikey görsel
+                boxWidth = Math.min(imgWidth, 300); // Maksimum 300px genişlik
+                boxHeight = boxWidth / targetRatio;
+            }
+            
+            // Seçim kutusunu ortala
+            const leftPos = (imgWidth - boxWidth) / 2;
+            const topPos = (imgHeight - boxHeight) / 2;
+            
+            // Seçim kutusunu ayarla
+            selectionBox.css({
+                width: boxWidth + 'px',
+                height: boxHeight + 'px',
+                left: leftPos + 'px',
+                top: topPos + 'px',
+                display: 'block'
+            });
+            
+            // Odak noktasını güncelle
+            updateFocalPoint();
+            
+            // Seçim kutusunu sürüklenebilir yap
+            selectionBox.draggable({
+                containment: gorselContainer,
+                drag: function() {
+                    updateFocalPoint();
+                }
+            });
+        });
+        
+        // Görsel üzerine tıklandığında seçim başlat
+        gorselContainer.on('mousedown', function(e) {
+            // Eğer seçim kutusu üzerine tıklandıysa, sürükleme işlemi başlatma
+            if ($(e.target).is(selectionBox)) {
+                return;
+            }
+            
+            // Seçim başlat
+            isSelecting = true;
+            
+            // Başlangıç koordinatlarını kaydet
+            const offset = gorselContainer.offset();
+            startX = e.pageX - offset.left;
+            startY = e.pageY - offset.top;
+            
+            // Seçim kutusunu başlangıç noktasına yerleştir
+            selectionBox.css({
+                left: startX + 'px',
+                top: startY + 'px',
+                width: '0',
+                height: '0',
+                display: 'block'
+            });
+            
+            // Diğer olayları engelle
+            e.preventDefault();
+        });
+        
+        // Fare hareket ettiğinde seçim kutusunu güncelle
+        $(document).on('mousemove', function(e) {
+            if (!isSelecting) return;
+            
+            const offset = gorselContainer.offset();
+            const currentX = e.pageX - offset.left;
+            const currentY = e.pageY - offset.top;
+            
+            // Görsel sınırlarını kontrol et
+            const imgWidth = modalOrijinalGorsel.width();
+            const imgHeight = modalOrijinalGorsel.height();
+            
+            const boundedX = Math.max(0, Math.min(currentX, imgWidth));
+            const boundedY = Math.max(0, Math.min(currentY, imgHeight));
+            
+            // Seçim kutusunun boyutlarını hesapla
+            let width = Math.abs(boundedX - startX);
+            let height = width / targetRatio;
+            
+            // Eğer yükseklik görsel sınırlarını aşıyorsa, genişliği yeniden hesapla
+            if (startY + height > imgHeight || startY - height < 0) {
+                height = Math.abs(boundedY - startY);
+                width = height * targetRatio;
+            }
+            
+            // Seçim kutusunun konumunu ve boyutunu güncelle
+            let left = startX;
+            let top = startY;
+            
+            if (boundedX < startX) left = boundedX;
+            if (boundedY < startY) top = boundedY;
+            
+            selectionBox.css({
+                left: left + 'px',
+                top: top + 'px',
+                width: width + 'px',
+                height: height + 'px'
+            });
+            
+            // Odak noktasını güncelle
+            updateFocalPoint();
+        });
+        
+        // Fare bırakıldığında seçimi tamamla
+        $(document).on('mouseup', function() {
+            isSelecting = false;
+        });
+        
+        // Odak noktasını güncelle
+        function updateFocalPoint() {
+            const imgWidth = modalOrijinalGorsel.width();
+            const imgHeight = modalOrijinalGorsel.height();
+            
+            const boxLeft = parseInt(selectionBox.css('left'));
+            const boxTop = parseInt(selectionBox.css('top'));
+            const boxWidth = parseInt(selectionBox.css('width'));
+            const boxHeight = parseInt(selectionBox.css('height'));
+            
+            // Seçim kutusunun merkez noktasını hesapla
+            const centerX = boxLeft + (boxWidth / 2);
+            const centerY = boxTop + (boxHeight / 2);
+            
+            // Odak noktasını 0-1 aralığında hesapla
+            const focalX = centerX / imgWidth;
+            const focalY = centerY / imgHeight;
+            
+            // Odak noktası değerlerini güncelle (2 ondalık basamağa yuvarla)
+            odakX.val(Math.round(focalX * 100) / 100);
+            odakY.val(Math.round(focalY * 100) / 100);
+        }
+        
+        // Odak noktasını kaydet ve işle
+        $("#odakNoktasiKaydet").click(function() {
+            const x = parseFloat(odakX.val());
+            const y = parseFloat(odakY.val());
+            
+            // Modal'ı kapat
+            $("#odakNoktasiModal").modal('hide');
+            
+            // İşlem durumunu göster
+            $("#islemDurumu").removeClass("d-none status-completed status-error").addClass("status-processing");
+            $("#islemMesaji").text("Görsel işleniyor...");
+            $("#islemSpinner").show();
+            
+            // AJAX isteği gönder
+            $.ajax({
+                url: "{{ url_for('haber_gorselini_odakla', haber_id=haber.id) }}",
+                type: "POST",
+                data: {
+                    odakX: x,
+                    odakY: y
+                },
+                success: function(response) {
+                    $("#islemDurumu").removeClass("status-processing").addClass("status-completed");
+                    $("#islemMesaji").text("Görsel başarıyla işlendi!");
+                    $("#islemSpinner").hide();
+                    
+                    // Sayfayı yenile
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                },
+                error: function(xhr) {
+                    $("#islemDurumu").removeClass("status-processing").addClass("status-error");
+                    $("#islemMesaji").text("Hata: " + (xhr.responseJSON?.message || "Görsel işlenemedi."));
+                    $("#islemSpinner").hide();
+                }
+            });
+        });
+        
+        // İşlem durumunu göster/gizle
+        $("form").on("submit", function() {
+            $("#islemDurumu").removeClass("d-none status-completed status-error").addClass("status-processing");
+            $("#islemMesaji").text("Görsel işleniyor...");
+            $("#islemSpinner").show();
+        });
+    });
+</script>
+{% endblock %} 

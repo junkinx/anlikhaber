@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}Haberler - Anlık Haber{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-newspaper me-2"></i>Haberler</h2>
+    <form action="{{ url_for('haberleri_cek') }}" method="post">
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-sync-alt me-1"></i>Yeni Haberleri Çek
+        </button>
+    </form>
+</div>
+
+{% if haberler.items %}
+    <div class="table-responsive">
+        <table class="table table-hover table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Başlık</th>
+                    <th scope="col">Kaynak</th>
+                    <th scope="col">Tarih</th>
+                    <th scope="col">Durum</th>
+                    <th scope="col">İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for haber in haberler.items %}
+                    <tr>
+                        <th scope="row">{{ haber.id }}</th>
+                        <td>
+                            <a href="{{ url_for('haber_detay', haber_id=haber.id) }}" class="text-decoration-none">
+                                {{ haber.baslik[:50] }}{% if haber.baslik|length > 50 %}...{% endif %}
+                            </a>
+                        </td>
+                        <td>{{ haber.kaynak }}</td>
+                        <td>{{ haber.olusturulma_zamani.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>
+                            {% if haber.paylasildi %}
+                                <span class="badge bg-success">Paylaşıldı</span>
+                            {% elif haber.paylasima_hazir %}
+                                <span class="badge bg-warning">Paylaşıma Hazır</span>
+                            {% elif haber.islenmis_gorsel_path %}
+                                <span class="badge bg-info">İşlendi</span>
+                            {% elif haber.gorsel_url %}
+                                <span class="badge bg-primary">Görsel Bulundu</span>
+                            {% elif haber.ozet %}
+                                <span class="badge bg-primary">Özetlendi</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Yeni</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('haber_detay', haber_id=haber.id) }}" class="btn btn-outline-primary" title="Detay">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if not haber.ozet %}
+                                    <form action="{{ url_for('haber_ozetle', haber_id=haber.id) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-primary" title="Özetle">
+                                            <i class="fas fa-file-alt"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                {% if not haber.gorsel_url %}
+                                    <form action="{{ url_for('haber_gorsel_bul', haber_id=haber.id) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-warning" title="Görsel Bul">
+                                            <i class="fas fa-image"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                {% if haber.gorsel_url and not haber.islenmis_gorsel_path %}
+                                    <form action="{{ url_for('haber_gorselini_isle', haber_id=haber.id) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-info" title="Görseli İşle">
+                                            <i class="fas fa-crop"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                {% if haber.islenmis_gorsel_path and haber.ozet and not haber.paylasima_hazir and not haber.paylasildi %}
+                                    <form action="{{ url_for('haber_paylasima_hazirla', haber_id=haber.id) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-warning" title="Paylaşıma Hazırla">
+                                            <i class="fas fa-check-circle"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                {% if haber.islenmis_gorsel_path and not haber.paylasildi %}
+                                    <form action="{{ url_for('haber_paylas', haber_id=haber.id) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-success" title="Instagram'da Paylaş">
+                                            <i class="fab fa-instagram"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Sayfalama -->
+    <nav aria-label="Sayfalama">
+        <ul class="pagination justify-content-center">
+            {% if haberler.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('haberler', page=haberler.prev_num) }}">Önceki</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">Önceki</span>
+                </li>
+            {% endif %}
+            
+            {% for page_num in haberler.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    {% if page_num == haberler.page %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                    {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('haberler', page=page_num) }}">{{ page_num }}</a>
+                        </li>
+                    {% endif %}
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if haberler.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('haberler', page=haberler.next_num) }}">Sonraki</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">Sonraki</span>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+{% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>Henüz hiç haber bulunmuyor. "Yeni Haberleri Çek" butonuna tıklayarak haberleri çekmeye başlayabilirsiniz.
+    </div>
+{% endif %}
+{% endblock %} 

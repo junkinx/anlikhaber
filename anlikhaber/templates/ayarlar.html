@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}Ayarlar - Anlık Haber{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Sistem Ayarları</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('ayarlar') }}">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-key me-2"></i>API Ayarları</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="ayar_openai_api_key" class="form-label">OpenAI API Anahtarı</label>
+                                <input type="password" class="form-control" id="ayar_openai_api_key" name="ayar_openai_api_key" 
+                                    value="{{ ayarlar|selectattr('anahtar', 'equalto', 'openai_api_key')|map(attribute='deger')|first|default('') }}">
+                                <div class="form-text">Haberleri özetlemek için kullanılır.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="ayar_pexels_api_key" class="form-label">Pexels API Anahtarı</label>
+                                <input type="password" class="form-control" id="ayar_pexels_api_key" name="ayar_pexels_api_key" 
+                                    value="{{ ayarlar|selectattr('anahtar', 'equalto', 'pexels_api_key')|map(attribute='deger')|first|default('') }}">
+                                <div class="form-text">Görselleri bulmak için kullanılır.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="fab fa-instagram me-2"></i>Instagram Ayarları</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="ayar_instagram_username" class="form-label">Instagram Kullanıcı Adı</label>
+                                <input type="text" class="form-control" id="ayar_instagram_username" name="ayar_instagram_username" 
+                                    value="{{ ayarlar|selectattr('anahtar', 'equalto', 'instagram_username')|map(attribute='deger')|first|default('') }}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="ayar_instagram_password" class="form-label">Instagram Şifresi</label>
+                                <input type="password" class="form-control" id="ayar_instagram_password" name="ayar_instagram_password" 
+                                    value="{{ ayarlar|selectattr('anahtar', 'equalto', 'instagram_password')|map(attribute='deger')|first|default('') }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Zamanlama Ayarları</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="ayar_check_interval" class="form-label">Kontrol Aralığı (saniye)</label>
+                                <input type="number" class="form-control" id="ayar_check_interval" name="ayar_check_interval" 
+                                    value="{{ ayarlar|selectattr('anahtar', 'equalto', 'check_interval')|map(attribute='deger')|first|default('600') }}" min="60">
+                                <div class="form-text">Haberlerin ne sıklıkla kontrol edileceğini belirler. Minimum 60 saniye.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="ayar_max_posts_per_day" class="form-label">Günlük Maksimum Paylaşım Sayısı</label>
+                                <input type="number" class="form-control" id="ayar_max_posts_per_day" name="ayar_max_posts_per_day" 
+                                    value="{{ ayarlar|selectattr('anahtar', 'equalto', 'max_posts_per_day')|map(attribute='deger')|first|default('5') }}" min="1" max="20">
+                                <div class="form-text">Instagram'da günlük yapılacak maksimum paylaşım sayısı.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0"><i class="fas fa-hashtag me-2"></i>Hashtag Ayarları</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="ayar_default_hashtags" class="form-label">Varsayılan Hashtag'ler</label>
+                                <textarea class="form-control" id="ayar_default_hashtags" name="ayar_default_hashtags" rows="4">{{ ayarlar|selectattr('anahtar', 'equalto', 'default_hashtags')|map(attribute='deger')|first|default('#sondakika #haber #gündem #türkiye #haberler') }}</textarea>
+                                <div class="form-text">Her paylaşımda kullanılacak hashtag'ler. Boşlukla ayırın.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filtreleme Ayarları</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="ayar_blocked_keywords" class="form-label">Engellenen Anahtar Kelimeler</label>
+                                <textarea class="form-control" id="ayar_blocked_keywords" name="ayar_blocked_keywords" rows="4">{{ ayarlar|selectattr('anahtar', 'equalto', 'blocked_keywords')|map(attribute='deger')|first|default('') }}</textarea>
+                                <div class="form-text">Bu kelimeleri içeren haberler paylaşılmayacak. Her kelimeyi yeni satıra yazın.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i>Ayarları Kaydet
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 
