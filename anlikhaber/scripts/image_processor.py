@@ -36,6 +36,37 @@ ISLENMIS_GORSEL_URL_YOLU = '/static/images/processed'  # Web URL yolu
 ORIJINAL_GORSEL_URL_YOLU = '/static/images/original'  # Orijinal görseller için URL yolu
 OVERLAY_GORSEL_YOLU = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'images', 'overlay.png')  # Overlay görsel yolu
 
+"""
+FONT ÖNERİLERİ:
+
+Şu anda kullanılan fontlar:
+1. Montserrat-ExtraBold.ttf - Özet metni için kullanılıyor (şu anda hata veriyor, Arial Bold'a düşüyor)
+2. Roboto-Bold.ttf - Kaynak metni için kullanılıyor (şu anda boş dosya)
+
+Alternatif modern font önerileri (Türkçe karakter desteği olan):
+1. Raleway - Montserrat ile mükemmel uyum sağlayan modern, temiz bir font
+2. Open Sans - Temiz, okunaklı ve modern bir font
+3. Poppins - Yuvarlak, modern ve şık bir font
+4. Nunito - Yumuşak köşeli, modern ve okunaklı
+5. Lato - Profesyonel ve modern görünüm
+6. PT Sans - Temiz ve modern, Kiril alfabesi desteği de var
+7. Source Sans Pro - Temiz ve profesyonel görünüm
+8. Overpass - Modern ve okunaklı
+9. Work Sans - Modern ve minimal
+10. Rubik - Yumuşak köşeli, modern ve şık
+
+Bu fontları kullanmak için:
+1. Google Fonts'tan indirin: https://fonts.google.com/
+2. TTF dosyasını anlikhaber/static/fonts/ klasörüne kopyalayın
+3. Aşağıdaki kodda font yolunu güncelleyin:
+   - montserrat_font_path değişkenini yeni font dosyasının yoluna güncelleyin
+   - Veya kaynak_font için truetype fonksiyonunda yolu değiştirin
+
+Örnek:
+montserrat_font_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                                   'static', 'fonts', 'Raleway-ExtraBold.ttf')
+"""
+
 # Klasörlerin var olduğundan emin ol
 os.makedirs(os.path.dirname(FONT_DOSYASI), exist_ok=True)
 os.makedirs(ISLENMIS_GORSEL_KLASORU, exist_ok=True)
@@ -43,39 +74,32 @@ os.makedirs(ORIJINAL_GORSEL_KLASORU, exist_ok=True)
 
 def gorsel_url_isle(gorsel_url, baslik, kaynak=None, odak_x=None, odak_y=None, haber=None):
     """
-    Görsel URL'sini işler ve üzerine metin ekler
+    Görsel URL'sini işleyerek Instagram için 4:5 oranında görsel oluşturur
     
     Args:
-        gorsel_url (str): İşlenecek görsel URL'si
-        baslik (str): Görsele eklenecek başlık
+        gorsel_url (str): İşlenecek görselin URL'si
+        baslik (str): Haberin başlığı
         kaynak (str, optional): Haber kaynağı
-        odak_x (float, optional): Görsel kırpma için x odak noktası (0-1 arası)
-        odak_y (float, optional): Görsel kırpma için y odak noktası (0-1 arası)
+        odak_x (float, optional): Yatay odak noktası (0-1 arası)
+        odak_y (float, optional): Dikey odak noktası (0-1 arası)
         haber (Haber, optional): Haber nesnesi
         
     Returns:
-        tuple: İşlenmiş görsel URL'si, orijinal görsel URL'si
+        dict: İşlenmiş görsel ve orijinal görsel URL yollarını içeren sözlük
     """
-    if not gorsel_url:
-        logger.warning(f"Görsel URL'si bulunamadı: {baslik}")
-        return None, None
-    
     try:
-        # URL'deki soru işareti ve parametreleri temizle
-        temiz_url = gorsel_url.split('?')[0] if '?' in gorsel_url else gorsel_url
+        # Instagram için 4:5 oranında görsel boyutları
+        INSTAGRAM_GENISLIK = 1080
+        INSTAGRAM_YUKSEKLIK = 1350  # 4:5 oranı
         
-        # Sabah gazetesi için özel işlem
-        if 'iasbh.tmgrup.com.tr' in temiz_url:
-            # URL'deki "u=" parametresini bul ve gerçek URL'yi çıkar
-            if 'u=' in gorsel_url:
-                try:
-                    gercek_url = gorsel_url.split('u=')[1]
-                    # Eğer URL'de başka parametreler varsa temizle
-                    if '?' in gercek_url:
-                        gercek_url = gercek_url.split('?')[0]
-                    temiz_url = gercek_url
-                except:
-                    logger.warning(f"Sabah URL'si işlenirken hata oluştu: {gorsel_url}")
+        # İçerik görseli için 13:14 oranında boyutlar
+        ICERIK_GENISLIK = 1080
+        ICERIK_YUKSEKLIK = 1163  # 13:14 oranı
+        
+        # Görsel URL'sini kontrol et
+        if not gorsel_url_gecerli_mi(gorsel_url):
+            logger.warning(f"Geçersiz görsel URL'si: {gorsel_url}")
+            return None
         
         # Geçici dosya yolu
         temp_image_path = os.path.join(ISLENMIS_GORSEL_KLASORU, 'temp_image.jpg')
@@ -84,7 +108,7 @@ def gorsel_url_isle(gorsel_url, baslik, kaynak=None, odak_x=None, odak_y=None, h
         logger.info(f"Görsel indiriliyor: {gorsel_url}")
         if not gorsel_indir(gorsel_url, temp_image_path):
             logger.error(f"Görsel indirilemedi: {gorsel_url}")
-            return None, None
+            return None
         
         # PIL ile görseli aç
         try:
@@ -92,446 +116,242 @@ def gorsel_url_isle(gorsel_url, baslik, kaynak=None, odak_x=None, odak_y=None, h
             logger.info(f"Görsel açıldı: {img.format}, {img.size}, {img.mode}")
         except Exception as e:
             logger.error(f"Görsel açılırken hata oluştu: {str(e)}")
+            return None
+        
+        # Orijinal görseli kaydet
+        zaman_damgasi = int(time.time())
+        orijinal_dosya_adi = f"original_{zaman_damgasi}.jpg"
+        orijinal_dosya_yolu = os.path.join(ORIJINAL_GORSEL_KLASORU, orijinal_dosya_adi)
+        img.save(orijinal_dosya_yolu, quality=95)
+        logger.info(f"Orijinal görsel kaydedildi: {orijinal_dosya_yolu}")
+        
+        # Orijinal görsel boyutları
+        img_width, img_height = img.size
+        
+        # Odak noktasını belirle (varsayılan olarak merkez)
+        if odak_x is None:
+            odak_x = 0.5
+        if odak_y is None:
+            odak_y = 0.5
+        
+        # Odak noktasını piksel koordinatlarına dönüştür
+        focus_x = int(odak_x * img_width)
+        focus_y = int(odak_y * img_height)
+        
+        # 13:14 oranında kırpma alanı hesapla
+        target_ratio = ICERIK_GENISLIK / ICERIK_YUKSEKLIK  # 13:14 oranı
+        
+        # Orijinal görselin oranına göre kırpma stratejisi belirle
+        if img_width / img_height > target_ratio:  # Görsel daha yatay
+            # Yüksekliğe göre genişliği hesapla
+            crop_height = min(img_height, ICERIK_YUKSEKLIK)
+            crop_width = int(crop_height * target_ratio)
             
-            # Alternatif yöntem deneyelim - BytesIO ile
-            try:
-                logger.info("BytesIO ile görsel açma deneniyor...")
-                img = Image.open(BytesIO(response.content))
-                logger.info(f"BytesIO ile görsel açıldı: {img.format}, {img.size}, {img.mode}")
-            except Exception as e2:
-                logger.error(f"BytesIO ile görsel açılırken hata oluştu: {str(e2)}")
-                raise Exception(f"Görsel açılamadı: {str(e2)}")
+            # Odak noktasına göre kırpma alanını hesapla
+            crop_left = max(0, min(focus_x - crop_width // 2, img_width - crop_width))
+            crop_top = max(0, min(focus_y - crop_height // 2, img_height - crop_height))
+        else:  # Görsel daha dikey
+            # Genişliğe göre yüksekliği hesapla
+            crop_width = min(img_width, ICERIK_GENISLIK)
+            crop_height = int(crop_width / target_ratio)
+            
+            # Odak noktasına göre kırpma alanını hesapla
+            crop_left = max(0, min(focus_x - crop_width // 2, img_width - crop_width))
+            crop_top = max(0, min(focus_y - crop_height // 2, img_height - crop_height))
+        
+        # Kırpma alanının sağ alt köşesini hesapla
+        crop_right = crop_left + crop_width
+        crop_bottom = crop_top + crop_height
+        
+        logger.info(f"Kırpma alanı: ({crop_left}, {crop_top}, {crop_right}, {crop_bottom})")
+        logger.info(f"Kırpma boyutları: {crop_width}x{crop_height}")
+        
+        # Görseli kırp
+        img_cropped = img.crop((crop_left, crop_top, crop_right, crop_bottom))
+        logger.info(f"Görsel kırpıldı: {img_cropped.size}")
+        
+        # Kırpılan görseli 13:14 oranında (1080x1163) boyutlandır
+        img_cropped = img_cropped.resize((ICERIK_GENISLIK, ICERIK_YUKSEKLIK), Image.Resampling.LANCZOS)
+        logger.info(f"Kırpılmış görsel yeniden boyutlandırıldı: {ICERIK_GENISLIK}x{ICERIK_YUKSEKLIK}")
+        
+        # 4:5 oranında (1080x1350) siyah arka plan oluştur
+        final_img = Image.new('RGB', (INSTAGRAM_GENISLIK, INSTAGRAM_YUKSEKLIK), (0, 0, 0))
+        
+        # İçerik görselini üst kısma yerleştir
+        final_img.paste(img_cropped, (0, 0))
+        logger.info(f"Görsel alt boşluk bırakılarak yerleştirildi, toplam boyut: {final_img.size}")
+        
+        # ImageDraw nesnesi oluştur
+        draw = ImageDraw.Draw(final_img)
+        logger.info("ImageDraw nesnesi oluşturuldu")
+        
+        # Font dosyalarını kontrol et ve yükle
+        raleway_bold_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Raleway-Bold.ttf')
+        raleway_thin_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Raleway-Thin.ttf')
+        
+        logger.info(f"Raleway Bold font dosyası yolu: {raleway_bold_path}")
+        logger.info(f"Raleway Bold font dosyası mevcut mu: {os.path.exists(raleway_bold_path)}")
+        logger.info(f"Raleway Thin font dosyası yolu: {raleway_thin_path}")
+        logger.info(f"Raleway Thin font dosyası mevcut mu: {os.path.exists(raleway_thin_path)}")
         
         try:
-            # Orijinal görseli kaydet
-            zaman_damgasi = int(time.time())
-            orijinal_dosya_adi = f"original_{zaman_damgasi}.jpg"
-            orijinal_dosya_yolu = os.path.join(ORIJINAL_GORSEL_KLASORU, orijinal_dosya_adi)
-            img.save(orijinal_dosya_yolu, quality=95)
-            logger.info(f"Orijinal görsel kaydedildi: {orijinal_dosya_yolu}")
-            
-            # Görseli boyutlandır ve kırp
-            img_width, img_height = img.size
-            
-            # Hedef en-boy oranı
-            hedef_oran = HEDEF_GENISLIK / HEDEF_YUKSEKLIK
-            
-            # Görsel en-boy oranı
-            gorsel_oran = img_width / img_height
-            
-            logger.info(f"Görsel oranı: {gorsel_oran}, Hedef oran: {hedef_oran}")
-            
-            # Yatay görsel (görsel oranı > hedef oran)
-            if gorsel_oran > hedef_oran:
-                logger.info("Yatay görsel tespit edildi, odak noktasını koruyarak kırpılacak")
-                
-                # Yeni yaklaşım: Alt kısımda boşluk bırakarak daha fazla görsel içeriği koruyalım
-                # Boşluk miktarı - hedef yüksekliğin %15'i kadar alt kısımda boşluk bırakalım
-                alt_bosluk_orani = 0.15
-                alt_bosluk = int(HEDEF_YUKSEKLIK * alt_bosluk_orani)
-                efektif_yukseklik = HEDEF_YUKSEKLIK - alt_bosluk
-                
-                # Önce görseli efektif yüksekliğe göre ölçeklendir
-                yeni_yukseklik = efektif_yukseklik
-                yeni_genislik = int(img_width * (efektif_yukseklik / img_height))
-                
-                # Görseli yeniden boyutlandır
-                img_resized = img.resize((yeni_genislik, yeni_yukseklik), Image.Resampling.LANCZOS)
-                logger.info(f"Görsel yeniden boyutlandırıldı: {yeni_genislik}x{yeni_yukseklik}")
-                
-                # Odak noktasını kullanarak kırp
-                if odak_x is not None:
-                    # Manuel odak noktası kullanılıyor
-                    odak_piksel_x = int(yeni_genislik * odak_x)
-                    # Odak noktasını merkez alarak kırp
-                    sol_kenar = max(0, odak_piksel_x - HEDEF_GENISLIK // 2)
-                    # Sağ kenarın görsel sınırlarını aşmamasını sağla
-                    if sol_kenar + HEDEF_GENISLIK > yeni_genislik:
-                        sol_kenar = yeni_genislik - HEDEF_GENISLIK
-                    sag_kenar = sol_kenar + HEDEF_GENISLIK
-                    logger.info(f"Manuel odak noktası kullanılıyor: x={odak_x}, piksel={odak_piksel_x}")
-                else:
-                    # Otomatik odak noktası (ortadan)
-                    sol_kenar = (yeni_genislik - HEDEF_GENISLIK) // 2
-                    sag_kenar = sol_kenar + HEDEF_GENISLIK
-                    logger.info("Otomatik odak noktası kullanılıyor (ortadan)")
-                
-                # Kırpma işlemi
-                img_cropped = img_resized.crop((sol_kenar, 0, sag_kenar, yeni_yukseklik))
-                logger.info(f"Görsel kırpıldı: {img_cropped.size}")
-                
-                # Hedef boyutlarda boş bir görsel oluştur (siyah arka plan)
-                img = Image.new('RGB', (HEDEF_GENISLIK, HEDEF_YUKSEKLIK), (0, 0, 0))
-                
-                # Kırpılmış görseli üst kısma yerleştir
-                img.paste(img_cropped, (0, 0))
-                logger.info(f"Görsel alt boşluk bırakılarak yerleştirildi, toplam boyut: {img.size}")
-            
-            # Dikey görsel (görsel oranı < hedef oran)
-            elif gorsel_oran < hedef_oran:
-                logger.info("Dikey görsel tespit edildi, odak noktasını koruyarak kırpılacak")
-                
-                # Önce görseli genişliğe göre ölçeklendir
-                yeni_genislik = HEDEF_GENISLIK
-                yeni_yukseklik = int(img_height * (HEDEF_GENISLIK / img_width))
-                
-                # Görseli yeniden boyutlandır
-                img = img.resize((yeni_genislik, yeni_yukseklik), Image.Resampling.LANCZOS)
-                logger.info(f"Görsel yeniden boyutlandırıldı: {yeni_genislik}x{yeni_yukseklik}")
-                
-                # Odak noktasını kullanarak kırp
-                if odak_y is not None:
-                    # Manuel odak noktası kullanılıyor
-                    odak_piksel_y = int(yeni_yukseklik * odak_y)
-                    # Odak noktasını merkez alarak kırp
-                    ust_kenar = max(0, odak_piksel_y - HEDEF_YUKSEKLIK // 2)
-                    # Alt kenarın görsel sınırlarını aşmamasını sağla
-                    if ust_kenar + HEDEF_YUKSEKLIK > yeni_yukseklik:
-                        ust_kenar = yeni_yukseklik - HEDEF_YUKSEKLIK
-                    alt_kenar = ust_kenar + HEDEF_YUKSEKLIK
-                    logger.info(f"Manuel odak noktası kullanılıyor: y={odak_y}, piksel={odak_piksel_y}")
-                else:
-                    # Otomatik odak noktası (üstten 1/3)
-                    ust_kenar = (yeni_yukseklik - HEDEF_YUKSEKLIK) // 3  # Üstten 1/3 oranında kırp
-                    alt_kenar = ust_kenar + HEDEF_YUKSEKLIK
-                    logger.info("Otomatik odak noktası kullanılıyor (üstten 1/3)")
-                
-                # Kırpma işlemi
-                img = img.crop((0, ust_kenar, yeni_genislik, alt_kenar))
-                logger.info(f"Görsel kırpıldı: {img.size}")
-            
-            # Tam orana sahip görsel
-            else:
-                logger.info("Görsel oranı hedef orana uygun, doğrudan boyutlandırılacak")
-                img = img.resize((HEDEF_GENISLIK, HEDEF_YUKSEKLIK), Image.Resampling.LANCZOS)
-                logger.info(f"Görsel yeniden boyutlandırıldı: {HEDEF_GENISLIK}x{HEDEF_YUKSEKLIK}")
-            
-            # Metin eklemek için
-            draw = ImageDraw.Draw(img)
-            logger.info("ImageDraw nesnesi oluşturuldu")
-            
-            # Font yükleme
-            try:
-                # Özel font dosyasını yüklemeyi dene
-                baslik_font_boyutu = 120  # Başlangıç font boyutu
-                kaynak_font_boyutu = 40
-                
-                # PIL'in kendi içindeki varsayılan fontlardan birini kullan
-                from PIL.ImageFont import truetype
-                try:
-                    # Sistem fontlarından birini kullan
-                    baslik_font = truetype("Arial", baslik_font_boyutu)
-                    kaynak_font = truetype("Arial", kaynak_font_boyutu)
-                    logger.info(f"Arial font yüklendi, boyut: {baslik_font_boyutu}")
-                except:
-                    try:
-                        # Alternatif olarak başka bir sistem fontu dene
-                        baslik_font = truetype("DejaVuSans", baslik_font_boyutu)
-                        kaynak_font = truetype("DejaVuSans", kaynak_font_boyutu)
-                        logger.info(f"DejaVuSans font yüklendi, boyut: {baslik_font_boyutu}")
-                    except:
-                        # Son çare olarak PIL'in kendi içindeki varsayılan fontu kullan
-                        logger.info("Sistem fontları bulunamadı, PIL'in kendi fontunu kullanıyoruz")
-                        from PIL import ImageFont
-                        baslik_font = ImageFont.load_default()
-                        kaynak_font = ImageFont.load_default()
-                        logger.info("PIL varsayılan fontu yüklendi")
-            except Exception as e:
-                logger.error(f"Font yüklenirken hata oluştu: {str(e)}")
-                # Varsayılan font kullan
-                baslik_font = ImageFont.load_default()
-                kaynak_font = ImageFont.load_default()
-                logger.info("Hata nedeniyle varsayılan font kullanılıyor")
-            
-            # Maksimum satır sayısı
-            MAX_SATIR_SAYISI = 3
-            
-            # Başlık için uygun font boyutunu ve satır genişliğini bul
-            def uygun_font_boyutu_bul(baslik, max_satir_sayisi, baslangic_boyutu, min_boyutu=40):
-                mevcut_boyut = baslangic_boyutu
-                uygun_boyut = None
-                uygun_satirlar = None
-                
-                while mevcut_boyut >= min_boyutu:
-                    try:
-                        # Mevcut font boyutu ile font oluştur
-                        try:
-                            font = truetype("Arial", mevcut_boyut)
-                        except:
-                            try:
-                                font = truetype("DejaVuSans", mevcut_boyut)
-                            except:
-                                # Varsayılan font kullan
-                                font = ImageFont.load_default()
-                        
-                        # Görsel genişliğinin %90'ını kullan
-                        max_genislik = int(HEDEF_GENISLIK * 0.9)
-                        
-                        # Başlığı satırlara böl
-                        # Karakter sayısı yerine piksel genişliğine göre hesaplama yap
-                        kelimeler = baslik.split()
-                        satirlar = []
-                        mevcut_satir = ""
-                        
-                        for kelime in kelimeler:
-                            test_satir = mevcut_satir + " " + kelime if mevcut_satir else kelime
-                            satir_genislik = draw.textlength(test_satir, font=font)
-                            
-                            if satir_genislik <= max_genislik:
-                                mevcut_satir = test_satir
-                            else:
-                                satirlar.append(mevcut_satir)
-                                mevcut_satir = kelime
-                        
-                        if mevcut_satir:
-                            satirlar.append(mevcut_satir)
-                        
-                        # Satır sayısı kontrolü
-                        if len(satirlar) <= max_satir_sayisi:
-                            uygun_boyut = mevcut_boyut
-                            uygun_satirlar = satirlar
-                            break
-                    except Exception as e:
-                        logger.error(f"Font boyutu hesaplanırken hata: {str(e)}")
-                    
-                    # Font boyutunu azalt
-                    mevcut_boyut -= 10
-                
-                # Eğer uygun boyut bulunamadıysa minimum boyutu kullan
-                if uygun_boyut is None:
-                    uygun_boyut = min_boyutu
-                    # Minimum boyutta tekrar satırlara böl
-                    try:
-                        font = truetype("Arial", uygun_boyut)
-                    except:
-                        try:
-                            font = truetype("DejaVuSans", uygun_boyut)
-                        except:
-                            font = ImageFont.load_default()
-                    
-                    max_genislik = int(HEDEF_GENISLIK * 0.9)
-                    kelimeler = baslik.split()
-                    satirlar = []
-                    mevcut_satir = ""
-                    
-                    for kelime in kelimeler:
-                        test_satir = mevcut_satir + " " + kelime if mevcut_satir else kelime
-                        satir_genislik = draw.textlength(test_satir, font=font)
-                        
-                        if satir_genislik <= max_genislik:
-                            mevcut_satir = test_satir
-                        else:
-                            satirlar.append(mevcut_satir)
-                            mevcut_satir = kelime
-                            
-                            # Maksimum satır sayısına ulaşıldıysa
-                            if len(satirlar) >= max_satir_sayisi - 1:
-                                break
-                    
-                    if mevcut_satir:
-                        satirlar.append(mevcut_satir)
-                    
-                    # Son satırı kısalt ve "..." ekle
-                    if len(satirlar) > max_satir_sayisi:
-                        son_satir = satirlar[max_satir_sayisi - 1]
-                        while draw.textlength(son_satir + "...", font=font) > max_genislik:
-                            son_satir = son_satir[:-1]
-                        
-                        satirlar = satirlar[:max_satir_sayisi - 1]
-                        satirlar.append(son_satir + "...")
-                    
-                    uygun_satirlar = satirlar
-                
-                return uygun_boyut, uygun_satirlar
-            
-            # Uygun font boyutunu ve satırları bul
-            baslik_font_boyutu, baslik_satirlari = uygun_font_boyutu_bul(baslik, MAX_SATIR_SAYISI, baslik_font_boyutu)
-            
-            # Font'u güncelle
-            try:
-                baslik_font = truetype("Arial", baslik_font_boyutu)
-            except:
-                try:
-                    baslik_font = truetype("DejaVuSans", baslik_font_boyutu)
-                except:
-                    baslik_font = ImageFont.load_default()
-            
-            logger.info(f"Başlık için uygun font boyutu: {baslik_font_boyutu}, Satır sayısı: {len(baslik_satirlari)}")
-            
-            # Başlık için toplam yükseklik hesapla
-            baslik_yukseklik = len(baslik_satirlari) * baslik_font_boyutu * 1.2
-            
             # Overlay görseli ekle
             try:
-                if os.path.exists(OVERLAY_GORSEL_YOLU):
+                if os.path.exists(OVERLAY_GORSEL_YOLU) and os.path.getsize(OVERLAY_GORSEL_YOLU) > 1000:
                     overlay_img = Image.open(OVERLAY_GORSEL_YOLU).convert("RGBA")
-                    
-                    # Overlay görselini ana görselin tam boyutuna göre yeniden boyutlandır
-                    overlay_width = HEDEF_GENISLIK
-                    overlay_height = HEDEF_YUKSEKLIK
-                    # Overlay yükseklik sınırlamasını kaldırıyoruz, tam oturması için
-                    overlay_img = overlay_img.resize((overlay_width, overlay_height), Image.Resampling.LANCZOS)
-                    
-                    # Overlay görselini tam görselin üzerine yerleştir
-                    overlay_y = 0
-                    
-                    logger.info(f"Overlay görseli ekleniyor: {OVERLAY_GORSEL_YOLU}, boyut: {overlay_width}x{overlay_height}, pozisyon: (0, {overlay_y})")
-                    
-                    # Overlay görselini ana görsele ekle
-                    if overlay_img.mode == 'RGBA':
-                        # RGBA modundaki görseli eklemek için
-                        img_rgba = img.convert("RGBA")
-                        img_rgba.paste(overlay_img, (0, int(overlay_y)), overlay_img)
-                        img = img_rgba.convert("RGB")
-                        draw = ImageDraw.Draw(img)  # Draw nesnesini yeniden oluştur
-                    else:
-                        # RGB modundaki görseli eklemek için
-                        img.paste(overlay_img, (0, int(overlay_y)))
-                    
+                    final_img.paste(overlay_img, (0, 0), overlay_img)
                     logger.info(f"Overlay görseli eklendi: {OVERLAY_GORSEL_YOLU}")
-                    
-                    # Haber özetini ekle (eğer varsa)
-                    if haber and haber.ozet:
-                        ozet_font_boyutu = 40  # Özet için font boyutu
-                        try:
-                            ozet_font = truetype("Arial", ozet_font_boyutu)
-                        except:
-                            try:
-                                ozet_font = truetype("DejaVuSans", ozet_font_boyutu)
-                            except:
-                                ozet_font = ImageFont.load_default()
-                        
-                        # Özet için maksimum satır sayısı
-                        MAX_OZET_SATIR_SAYISI = 5
-                        
-                        # Görsel genişliğinin %80'ini kullan
-                        max_genislik = int(HEDEF_GENISLIK * 0.8)
-                        
-                        # Özeti satırlara böl
-                        kelimeler = haber.ozet.split()
-                        satirlar = []
-                        mevcut_satir = ""
-                        
-                        for kelime in kelimeler:
-                            test_satir = mevcut_satir + " " + kelime if mevcut_satir else kelime
-                            satir_genislik = draw.textlength(test_satir, font=ozet_font)
-                            
-                            if satir_genislik <= max_genislik:
-                                mevcut_satir = test_satir
-                            else:
-                                satirlar.append(mevcut_satir)
-                                mevcut_satir = kelime
-                                
-                                # Maksimum satır sayısına ulaşıldıysa
-                                if len(satirlar) >= MAX_OZET_SATIR_SAYISI - 1:
-                                    break
-                        
-                        if mevcut_satir:
-                            satirlar.append(mevcut_satir)
-                        
-                        # Son satırı kısalt ve "..." ekle
-                        if len(satirlar) > MAX_OZET_SATIR_SAYISI:
-                            son_satir = satirlar[MAX_OZET_SATIR_SAYISI - 1]
-                            while draw.textlength(son_satir + "...", font=ozet_font) > max_genislik:
-                                son_satir = son_satir[:-1]
-                            
-                            satirlar = satirlar[:MAX_OZET_SATIR_SAYISI - 1]
-                            satirlar.append(son_satir + "...")
-                        
-                        # Özeti overlay'in alt kısmına yerleştir
-                        ozet_y_pozisyon = HEDEF_YUKSEKLIK - (len(satirlar) * ozet_font_boyutu * 1.2) - 200  # Alt kenardan 200 piksel yukarı
-                        
-                        # Özeti ekle
-                        for satir in satirlar:
-                            # Satırı sola yasla (sol kenardan 100 piksel içeri)
-                            x_pozisyon = 100
-                            
-                            # Metin gölgesi
-                            for i in range(1, 4):  # Gölge için
-                                draw.text((x_pozisyon+i, ozet_y_pozisyon+i), satir, font=ozet_font, fill=(0, 0, 0))
-                            
-                            # Asıl metin
-                            draw.text((x_pozisyon, ozet_y_pozisyon), satir, font=ozet_font, fill=(255, 255, 255))
-                            
-                            # Bir sonraki satır için y pozisyonunu güncelle
-                            ozet_y_pozisyon += ozet_font_boyutu * 1.2
-                        
-                        logger.info("Haber özeti eklendi")
                 else:
-                    logger.warning(f"Overlay görseli bulunamadı: {OVERLAY_GORSEL_YOLU}")
+                    logger.warning(f"Overlay görsel dosyası bulunamadı veya geçersiz: {OVERLAY_GORSEL_YOLU}")
             except Exception as e:
-                logger.error(f"Overlay görseli eklenirken hata oluştu: {str(e)}")
-                logger.error(traceback.format_exc())
+                logger.error(f"Overlay görseli eklenirken hata: {str(e)}")
             
-            # Kaynak bilgisini ekle (eğer varsa)
-            if kaynak:
-                kaynak_metni = f"Kaynak: {kaynak}"
+            # Özet metni için font
+            ozet_font_size = 40
+            ozet_font = ImageFont.truetype(raleway_bold_path, ozet_font_size) if os.path.exists(raleway_bold_path) else ImageFont.load_default()
+            logger.info(f"Özet font yüklendi: {'Raleway-Bold' if os.path.exists(raleway_bold_path) else 'Default'}, boyut: {ozet_font_size}")
+            
+            # Kaynak ve tarih için font
+            kaynak_font_size = 30
+            kaynak_font = ImageFont.truetype(raleway_thin_path, kaynak_font_size) if os.path.exists(raleway_thin_path) else ImageFont.load_default()
+            logger.info(f"Kaynak ve tarih font yüklendi: {'Raleway-Thin' if os.path.exists(raleway_thin_path) else 'Default'}, boyut: {kaynak_font_size}")
+            
+            # Özet metnini ekle
+            try:
+                ozet_text = haber.ozet if haber.ozet else f"Bu haber için otomatik oluşturulmuş örnek bir özet metnidir. Haber başlığı: {baslik}"
                 
-                # Kaynağı sağ alt köşeye yerleştir
-                x_pozisyon = HEDEF_GENISLIK - 400  # Sağ kenardan 400 piksel içeri
-                y_pozisyon = HEDEF_YUKSEKLIK - 100  # Alt kenardan 100 piksel yukarı
+                # Metni görsel üzerinde nasıl görüneceğini hesaplamak için
+                # Önce metnin genişliğini ve yüksekliğini hesaplayalım
+                max_width = INSTAGRAM_GENISLIK - 200  # Kenarlardan 100px boşluk
                 
-                # Metin gölgesi
-                for i in range(1, 4):  # Daha kalın gölge için
-                    draw.text((x_pozisyon+i, y_pozisyon+i), kaynak_metni, font=kaynak_font, fill=(0, 0, 0))
+                # Metni satırlara böl (manuel olarak)
+                lines = []
                 
-                # Asıl metin
-                draw.text((x_pozisyon, y_pozisyon), kaynak_metni, font=kaynak_font, fill=(255, 255, 255))
+                # Satır boşluklarını kontrol et
+                if '\n' in ozet_text:
+                    # Her satırı ayrı ayrı işle
+                    raw_lines = ozet_text.split('\n')
+                    
+                    for raw_line in raw_lines:
+                        if not raw_line.strip():
+                            # Boş satır ise direkt ekle
+                            lines.append("")
+                        else:
+                            # Normal satırı kelime kelime işle
+                            words_in_line = raw_line.split()
+                            line_current = []
+                            
+                            for word in words_in_line:
+                                # Mevcut satıra kelimeyi ekleyip genişliği kontrol et
+                                test_line = ' '.join(line_current + [word])
+                                if ozet_font.getbbox(test_line)[2] <= max_width:
+                                    line_current.append(word)
+                                else:
+                                    # Satır doldu, yeni satıra geç
+                                    if line_current:  # Boş satır eklemeyi önle
+                                        lines.append(' '.join(line_current))
+                                    line_current = [word]
+                            
+                            # Son satırı ekle
+                            if line_current:
+                                lines.append(' '.join(line_current))
+                else:
+                    # Satır içermeyen metinler için normal satır bölme işlemi
+                    words = ozet_text.split()
+                    current_line = []
+                    
+                    for word in words:
+                        # Mevcut satıra kelimeyi ekleyip genişliği kontrol et
+                        test_line = ' '.join(current_line + [word])
+                        if ozet_font.getbbox(test_line)[2] <= max_width:
+                            current_line.append(word)
+                        else:
+                            # Satır doldu, yeni satıra geç
+                            if current_line:  # Boş satır eklemeyi önle
+                                lines.append(' '.join(current_line))
+                            current_line = [word]
+                    
+                    # Son satırı ekle
+                    if current_line:
+                        lines.append(' '.join(current_line))
                 
+                # Satır sayısını hesapla
+                satir_sayisi = len(lines)
+                logger.info(f"Özet metni satır sayısı: {satir_sayisi}")
+                
+                # Satır sayısına göre Y pozisyonunu ayarla
+                if satir_sayisi <= 5:
+                    ozet_y = 950  # 5 satır veya daha az
+                elif satir_sayisi == 6:
+                    ozet_y = 900   # 6 satır
+                elif satir_sayisi == 7:
+                    ozet_y = 850   # 7 satır
+                elif satir_sayisi == 8:
+                    ozet_y = 800   # 8 satır
+                elif satir_sayisi == 9:
+                    ozet_y = 750   # 9 satır
+                else:
+                    ozet_y = 700   # 10 satır veya daha fazla
+                
+                # Metni görsel üzerine yerleştir
+                # Boş satırları özel işle
+                spacing = 10  # Satırlar arası mesafe (15'ten 10'a düşürüldü)
+                
+                # Her satırı ayrı ayrı çiz, boş satırlar için daha fazla boşluk bırak
+                current_y = ozet_y
+                for line in lines:
+                    if line.strip() == "":  # Boş satır kontrolü
+                        # Boş satır için sadece boşluk bırak, ekstra boşluk için 0.75*spacing
+                        current_y += ozet_font.getbbox("A")[3] + int(0.75*spacing)
+                    else:
+                        # Normal satırı çiz
+                        draw.text((100, current_y), line, font=ozet_font, fill=(255, 255, 255))
+                        current_y += ozet_font.getbbox("A")[3] + spacing
+                
+                logger.info("Özet metni eklendi")
+                
+                # Sadece kaynak bilgisini ekle
+                kaynak_text = f"Kaynak: {haber.kaynak}" if haber.kaynak else ""
+                
+                # Kaynak bilgisini en alta ekle
+                kaynak_y = INSTAGRAM_YUKSEKLIK - 100  # Alt kenardan 100px yukarıda (50px yerine)
+                draw.text((100, kaynak_y), kaynak_text, font=kaynak_font, fill=(200, 200, 200))
                 logger.info("Kaynak bilgisi eklendi")
-            
-            # Tarih bilgisini ekle
-            tarih_metni = datetime.now().strftime("%d.%m.%Y")
-            
-            # Tarihi sol alt köşeye yerleştir
-            x_pozisyon = 50
-            y_pozisyon = HEDEF_YUKSEKLIK - 100  # Alt kenardan 100 piksel yukarı
-            
-            # Metin gölgesi
-            for i in range(1, 4):  # Daha kalın gölge için
-                draw.text((x_pozisyon+i, y_pozisyon+i), tarih_metni, font=kaynak_font, fill=(0, 0, 0))
-            
-            # Asıl metin
-            draw.text((x_pozisyon, y_pozisyon), tarih_metni, font=kaynak_font, fill=(255, 255, 255))
-            
-            logger.info("Tarih bilgisi eklendi")
-            
-            # Dosya adı oluştur
-            dosya_adi = f"haber_{zaman_damgasi}.jpg"
-            dosya_yolu = os.path.join(ISLENMIS_GORSEL_KLASORU, dosya_adi)
-            
-            # Görseli kaydet
-            logger.info(f"İşlenmiş görsel kaydediliyor: {dosya_yolu}")
-            img.save(dosya_yolu, quality=95)
-            logger.info("İşlenmiş görsel başarıyla kaydedildi")
-            
-            # Geçici dosyayı sil
-            if os.path.exists(temp_image_path):
-                os.remove(temp_image_path)
-                logger.info("Geçici dosya silindi")
-            
-            # Web URL yolunu döndür
-            web_url_yolu = f"{ISLENMIS_GORSEL_URL_YOLU}/{dosya_adi}"
-            orijinal_web_url_yolu = f"{ORIJINAL_GORSEL_URL_YOLU}/{orijinal_dosya_adi}"
-            
-            logger.info(f"İşlenmiş görsel URL yolu: {web_url_yolu}")
-            logger.info(f"Orijinal görsel URL yolu: {orijinal_web_url_yolu}")
-            
-            # İşlenmiş görsel URL'si ve orijinal görsel URL'sini içeren bir sözlük döndür
-            return {
-                "islenmis_gorsel_url": web_url_yolu,
-                "orijinal_gorsel_url": orijinal_web_url_yolu,
-                "zaman_damgasi": zaman_damgasi
-            }
+                
+            except Exception as e:
+                logger.error(f"Metin eklenirken hata: {str(e)}")
+                logger.error(traceback.format_exc())
         except Exception as e:
-            logger.error(f"Görsel işleme sırasında hata oluştu: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise
-    
+            logger.error(f"Font yüklenirken hata: {str(e)}")
+        
+        # İşlenmiş görseli kaydet
+        islenmis_dosya_adi = f"haber_{zaman_damgasi}.jpg"
+        islenmis_dosya_yolu = os.path.join(ISLENMIS_GORSEL_KLASORU, islenmis_dosya_adi)
+        logger.info(f"İşlenmiş görsel kaydediliyor: {islenmis_dosya_yolu}")
+        final_img.save(islenmis_dosya_yolu, quality=95)
+        logger.info("İşlenmiş görsel başarıyla kaydedildi")
+        
+        # Geçici dosyayı sil
+        if os.path.exists(temp_image_path):
+            os.remove(temp_image_path)
+            logger.info("Geçici dosya silindi")
+        
+        # Web URL yolunu döndür
+        web_url_yolu = f"{ISLENMIS_GORSEL_URL_YOLU}/{islenmis_dosya_adi}"
+        orijinal_web_url_yolu = f"{ORIJINAL_GORSEL_URL_YOLU}/{orijinal_dosya_adi}"
+        
+        logger.info(f"İşlenmiş görsel URL yolu: {web_url_yolu}")
+        logger.info(f"Orijinal görsel URL yolu: {orijinal_web_url_yolu}")
+        
+        return {
+            "islenmis_gorsel_url": web_url_yolu,
+            "orijinal_gorsel_url": orijinal_web_url_yolu
+        }
+        
     except Exception as e:
-        logger.error(f"Görsel işlenirken hata oluştu: {gorsel_url} - {str(e)}")
+        logger.error(f"Görsel işlenirken hata oluştu: {str(e)}")
         logger.error(traceback.format_exc())
-        return None, None
+        return None
 
 def islenmemis_haberleri_isle():
     """Veritabanındaki işlenmemiş görselleri olan haberleri işler"""
@@ -646,6 +466,292 @@ def haber_gorselini_isle(haber_id, odak_x=None, odak_y=None, force_reprocess=Fal
     
     except Exception as e:
         logger.error(f"Haber görseli işlenirken hata oluştu (ID: {haber_id}): {str(e)}")
+        logger.error(traceback.format_exc())
+        db.session.rollback()
+        return None
+
+def haber_gorselini_kirp(haber_id, crop_x, crop_y, crop_width, crop_height):
+    """
+    Belirli bir haberin görselini kırparak işler
+    
+    Args:
+        haber_id (int): Haberin ID'si
+        crop_x (int): Kırpma başlangıç X koordinatı
+        crop_y (int): Kırpma başlangıç Y koordinatı
+        crop_width (int): Kırpma genişliği
+        crop_height (int): Kırpma yüksekliği
+        
+    Returns:
+        str: İşlenmiş görselin URL yolu
+    """
+    try:
+        # Instagram için 4:5 oranında görsel boyutları
+        INSTAGRAM_GENISLIK = 1080
+        INSTAGRAM_YUKSEKLIK = 1350  # 4:5 oranı
+        
+        # İçerik görseli için 13:14 oranında boyutlar
+        ICERIK_GENISLIK = 1080
+        ICERIK_YUKSEKLIK = 1163  # 13:14 oranı
+        
+        # Haberi al
+        haber = Haber.query.get(haber_id)
+        
+        if not haber:
+            logger.error(f"Haber bulunamadı: ID {haber_id}")
+            return None
+        
+        # Eğer haberin özeti yoksa, örnek bir özet ekle
+        if not haber.ozet:
+            logger.info(f"Haber ID {haber_id} için özet ekleniyor...")
+            haber.ozet = f"Bu haber için otomatik oluşturulmuş örnek bir özet metnidir. Gerçek özet, AI tarafından oluşturulacaktır. Haber başlığı: {haber.baslik}"
+            db.session.commit()
+            logger.info(f"Özet eklendi: {haber.ozet}")
+        
+        logger.info(f"Haber görseli kırpılarak işleniyor: {haber.baslik}")
+        logger.info(f"Kırpma parametreleri: X={crop_x}, Y={crop_y}, Genişlik={crop_width}, Yükseklik={crop_height}")
+        
+        # Orijinal görseli indir
+        temp_image_path = os.path.join(ISLENMIS_GORSEL_KLASORU, 'temp_image.jpg')
+        
+        if not gorsel_indir(haber.gorsel_url, temp_image_path):
+            logger.error(f"Görsel indirilemedi: {haber.gorsel_url}")
+            return None
+        
+        # PIL ile görseli aç
+        try:
+            img = Image.open(temp_image_path)
+            logger.info(f"Görsel açıldı: {img.format}, {img.size}, {img.mode}")
+        except Exception as e:
+            logger.error(f"Görsel açılırken hata oluştu: {str(e)}")
+            return None
+        
+        # Orijinal görseli kaydet
+        zaman_damgasi = int(time.time())
+        orijinal_dosya_adi = f"original_{zaman_damgasi}.jpg"
+        orijinal_dosya_yolu = os.path.join(ORIJINAL_GORSEL_KLASORU, orijinal_dosya_adi)
+        img.save(orijinal_dosya_yolu, quality=95)
+        logger.info(f"Orijinal görsel kaydedildi: {orijinal_dosya_yolu}")
+        
+        # Görseli kırp
+        try:
+            # Kırpma alanının görsel sınırları içinde olduğundan emin ol
+            img_width, img_height = img.size
+            
+            # Kırpma alanını sınırla
+            crop_x = max(0, min(int(crop_x), img_width - 1))
+            crop_y = max(0, min(int(crop_y), img_height - 1))
+            crop_width = max(1, min(int(crop_width), img_width - crop_x))
+            crop_height = max(1, min(int(crop_height), img_height - crop_y))
+            
+            # Görseli kırp
+            img_cropped = img.crop((crop_x, crop_y, crop_x + crop_width, crop_y + crop_height))
+            logger.info(f"Görsel kırpıldı: {img_cropped.size}")
+            
+            # Kırpılmış görselin oranını hesapla
+            cropped_ratio = crop_width / crop_height
+            target_ratio = ICERIK_GENISLIK / ICERIK_YUKSEKLIK  # 13:14 oranı
+            
+            logger.info(f"Kırpılmış görsel oranı: {cropped_ratio}, Hedef oran: {target_ratio}")
+            
+            # 13:14 oranında (1080x1163) siyah arka plan oluştur
+            content_img = Image.new('RGB', (ICERIK_GENISLIK, ICERIK_YUKSEKLIK), (0, 0, 0))
+            
+            # Kırpılmış görseli içerik görselinin içine sığdır (oranını koruyarak)
+            # Kırpılmış görselin boyutlarını hesapla
+            if cropped_ratio > target_ratio:  # Kırpılmış görsel daha yatay
+                # Genişliğe göre ölçeklendir
+                new_width = ICERIK_GENISLIK
+                new_height = int(new_width / cropped_ratio)
+            else:  # Kırpılmış görsel daha dikey
+                # Yüksekliğe göre ölçeklendir
+                new_height = ICERIK_YUKSEKLIK
+                new_width = int(new_height * cropped_ratio)
+            
+            # Kırpılmış görseli yeniden boyutlandır
+            img_cropped = img_cropped.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            logger.info(f"Kırpılmış görsel yeniden boyutlandırıldı: {new_width}x{new_height}")
+            
+            # Kırpılmış görseli içerik görselinin ortasına yerleştir
+            paste_x = (ICERIK_GENISLIK - new_width) // 2
+            paste_y = (ICERIK_YUKSEKLIK - new_height) // 2
+            content_img.paste(img_cropped, (paste_x, paste_y))
+            logger.info(f"Kırpılmış görsel içerik görselinin ortasına yerleştirildi: {paste_x}, {paste_y}")
+            
+            # 4:5 oranında (1080x1350) siyah arka plan oluştur
+            final_img = Image.new('RGB', (INSTAGRAM_GENISLIK, INSTAGRAM_YUKSEKLIK), (0, 0, 0))
+            
+            # İçerik görselini üst kısma yerleştir
+            final_img.paste(content_img, (0, 0))
+            logger.info(f"Görsel alt boşluk bırakılarak yerleştirildi, toplam boyut: {final_img.size}")
+            
+            # ImageDraw nesnesi oluştur
+            draw = ImageDraw.Draw(final_img)
+            logger.info("ImageDraw nesnesi oluşturuldu")
+            
+            # Font dosyalarını kontrol et ve yükle
+            raleway_bold_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Raleway-Bold.ttf')
+            raleway_thin_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Raleway-Thin.ttf')
+            
+            logger.info(f"Raleway Bold font dosyası yolu: {raleway_bold_path}")
+            logger.info(f"Raleway Bold font dosyası mevcut mu: {os.path.exists(raleway_bold_path)}")
+            logger.info(f"Raleway Thin font dosyası yolu: {raleway_thin_path}")
+            logger.info(f"Raleway Thin font dosyası mevcut mu: {os.path.exists(raleway_thin_path)}")
+            
+            try:
+                # Overlay görseli ekle
+                try:
+                    if os.path.exists(OVERLAY_GORSEL_YOLU) and os.path.getsize(OVERLAY_GORSEL_YOLU) > 1000:
+                        overlay_img = Image.open(OVERLAY_GORSEL_YOLU).convert("RGBA")
+                        final_img.paste(overlay_img, (0, 0), overlay_img)
+                        logger.info(f"Overlay görseli eklendi: {OVERLAY_GORSEL_YOLU}")
+                    else:
+                        logger.warning(f"Overlay görsel dosyası bulunamadı veya geçersiz: {OVERLAY_GORSEL_YOLU}")
+                except Exception as e:
+                    logger.error(f"Overlay görseli eklenirken hata: {str(e)}")
+                
+                # Özet metni için font
+                ozet_font_size = 40
+                ozet_font = ImageFont.truetype(raleway_bold_path, ozet_font_size) if os.path.exists(raleway_bold_path) else ImageFont.load_default()
+                logger.info(f"Özet font yüklendi: {'Raleway-Bold' if os.path.exists(raleway_bold_path) else 'Default'}, boyut: {ozet_font_size}")
+                
+                # Kaynak ve tarih için font
+                kaynak_font_size = 30
+                kaynak_font = ImageFont.truetype(raleway_thin_path, kaynak_font_size) if os.path.exists(raleway_thin_path) else ImageFont.load_default()
+                logger.info(f"Kaynak ve tarih font yüklendi: {'Raleway-Thin' if os.path.exists(raleway_thin_path) else 'Default'}, boyut: {kaynak_font_size}")
+                
+                # Özet metnini ekle
+                try:
+                    ozet_text = haber.ozet if haber.ozet else f"Bu haber için otomatik oluşturulmuş örnek bir özet metnidir. Haber başlığı: {haber.baslik}"
+                    
+                    # Metni görsel üzerinde nasıl görüneceğini hesaplamak için
+                    # Önce metnin genişliğini ve yüksekliğini hesaplayalım
+                    max_width = INSTAGRAM_GENISLIK - 200  # Kenarlardan 100px boşluk
+                    
+                    # Metni satırlara böl (manuel olarak)
+                    lines = []
+                    
+                    # Satır boşluklarını kontrol et
+                    if '\n' in ozet_text:
+                        # Her satırı ayrı ayrı işle
+                        raw_lines = ozet_text.split('\n')
+                        
+                        for raw_line in raw_lines:
+                            if not raw_line.strip():
+                                # Boş satır ise direkt ekle
+                                lines.append("")
+                            else:
+                                # Normal satırı kelime kelime işle
+                                words_in_line = raw_line.split()
+                                line_current = []
+                                
+                                for word in words_in_line:
+                                    # Mevcut satıra kelimeyi ekleyip genişliği kontrol et
+                                    test_line = ' '.join(line_current + [word])
+                                    if ozet_font.getbbox(test_line)[2] <= max_width:
+                                        line_current.append(word)
+                                    else:
+                                        # Satır doldu, yeni satıra geç
+                                        if line_current:  # Boş satır eklemeyi önle
+                                            lines.append(' '.join(line_current))
+                                        line_current = [word]
+                                
+                                # Son satırı ekle
+                                if line_current:
+                                    lines.append(' '.join(line_current))
+                    else:
+                        # Satır içermeyen metinler için normal satır bölme işlemi
+                        words = ozet_text.split()
+                        current_line = []
+                        
+                        for word in words:
+                            # Mevcut satıra kelimeyi ekleyip genişliği kontrol et
+                            test_line = ' '.join(current_line + [word])
+                            if ozet_font.getbbox(test_line)[2] <= max_width:
+                                current_line.append(word)
+                            else:
+                                # Satır doldu, yeni satıra geç
+                                if current_line:  # Boş satır eklemeyi önle
+                                    lines.append(' '.join(current_line))
+                                current_line = [word]
+                        
+                        # Son satırı ekle
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                
+                    # Satır sayısını hesapla
+                    satir_sayisi = len(lines)
+                    logger.info(f"Özet metni satır sayısı: {satir_sayisi}")
+                    
+                    # Satır sayısına göre Y pozisyonunu ayarla
+                    if satir_sayisi <= 5:
+                        ozet_y = 950  # 5 satır veya daha az
+                    elif satir_sayisi == 6:
+                        ozet_y = 900   # 6 satır
+                    elif satir_sayisi == 7:
+                        ozet_y = 850   # 7 satır
+                    elif satir_sayisi == 8:
+                        ozet_y = 800   # 8 satır
+                    elif satir_sayisi == 9:
+                        ozet_y = 750   # 9 satır
+                    else:
+                        ozet_y = 700   # 10 satır veya daha fazla
+                    
+                    # Metni görsel üzerine yerleştir
+                    # Boş satırları özel işle
+                    spacing = 10  # Satırlar arası mesafe (15'ten 10'a düşürüldü)
+                    
+                    # Her satırı ayrı ayrı çiz, boş satırlar için daha fazla boşluk bırak
+                    current_y = ozet_y
+                    for line in lines:
+                        if line.strip() == "":  # Boş satır kontrolü
+                            # Boş satır için sadece boşluk bırak, ekstra boşluk için 0.75*spacing
+                            current_y += ozet_font.getbbox("A")[3] + int(0.75*spacing)
+                        else:
+                            # Normal satırı çiz
+                            draw.text((100, current_y), line, font=ozet_font, fill=(255, 255, 255))
+                            current_y += ozet_font.getbbox("A")[3] + spacing
+                
+                    logger.info("Özet metni eklendi")
+                    
+                    # Sadece kaynak bilgisini ekle
+                    kaynak_text = f"Kaynak: {haber.kaynak}" if haber.kaynak else ""
+                    
+                    # Kaynak bilgisini en alta ekle
+                    kaynak_y = INSTAGRAM_YUKSEKLIK - 100  # Alt kenardan 100px yukarıda (50px yerine)
+                    draw.text((100, kaynak_y), kaynak_text, font=kaynak_font, fill=(200, 200, 200))
+                    logger.info("Kaynak bilgisi eklendi")
+                    
+                except Exception as e:
+                    logger.error(f"Metin eklenirken hata: {str(e)}")
+                    logger.error(traceback.format_exc())
+            except Exception as e:
+                logger.error(f"Font yüklenirken hata: {str(e)}")
+            
+            # İşlenmiş görseli kaydet
+            islenmis_dosya_adi = f"haber_{zaman_damgasi}.jpg"
+            islenmis_dosya_yolu = os.path.join(ISLENMIS_GORSEL_KLASORU, islenmis_dosya_adi)
+            final_img.save(islenmis_dosya_yolu, quality=95)
+            logger.info(f"İşlenmiş görsel kaydedildi: {islenmis_dosya_yolu}")
+            
+            # Haberi güncelle
+            haber.islenmis_gorsel_path = os.path.join(ISLENMIS_GORSEL_URL_YOLU, islenmis_dosya_adi)
+            haber.orijinal_gorsel_path = os.path.join(ORIJINAL_GORSEL_URL_YOLU, orijinal_dosya_adi)
+            db.session.commit()
+            
+            # Geçici dosyayı sil
+            if os.path.exists(temp_image_path):
+                os.remove(temp_image_path)
+                logger.info("Geçici dosya silindi")
+            
+            return haber.islenmis_gorsel_path
+            
+        except Exception as e:
+            logger.error(f"Görsel işlenirken hata oluştu: {str(e)}")
+            logger.error(traceback.format_exc())
+            return None
+            
+    except Exception as e:
+        logger.error(f"Haber görseli kırpılırken genel hata oluştu: {str(e)}")
         logger.error(traceback.format_exc())
         db.session.rollback()
         return None

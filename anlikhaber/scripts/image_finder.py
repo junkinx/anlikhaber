@@ -33,98 +33,50 @@ if not PEXELS_API_KEY:
     logger.warning("PEXELS_API_KEY bulunamadı. .env dosyasını kontrol edin. Pexels API kullanılamayacak.")
 
 def gorsel_url_gecerli_mi(url):
-    """Görsel URL'sinin geçerli olup olmadığını kontrol eder"""
+    """Görsel URL'sinin geçerli olup olmadığını kontrol eder."""
     if not url:
         return False
     
-    try:
-        # URL'deki soru işareti ve parametreleri temizle
-        temiz_url = url.split('?')[0] if '?' in url else url
-        
-        # Sabah gazetesi için özel işlem
-        if 'iasbh.tmgrup.com.tr' in temiz_url:
-            # URL'deki "u=" parametresini bul ve gerçek URL'yi çıkar
-            if 'u=' in url:
-                try:
-                    gercek_url = url.split('u=')[1]
-                    # Eğer URL'de başka parametreler varsa temizle
-                    if '?' in gercek_url:
-                        gercek_url = gercek_url.split('?')[0]
-                    temiz_url = gercek_url
-                except:
-                    logger.warning(f"Sabah URL'si işlenirken hata oluştu: {url}")
-        
-        # URL formatını kontrol et
-        parsed = urlparse(temiz_url)
-        if not all([parsed.scheme, parsed.netloc]):
+    # Bazı URL'ler geçersiz olabilir veya görsel içermeyebilir
+    gecersiz_uzantilar = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip', '.rar']
+    for uzanti in gecersiz_uzantilar:
+        if url.lower().endswith(uzanti):
             return False
-        
-        # Görsel uzantısını kontrol et
-        if temiz_url.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
-            # Uzantı doğruysa, doğrudan geçerli kabul et
-            return True
-        
-        try:
-            # Uzantı yoksa, HEAD isteği ile MIME tipini kontrol et
-            # Zaman aşımı süresini 15 saniyeye çıkaralım
-            response = requests.head(url, timeout=15)
-            content_type = response.headers.get('Content-Type', '')
-            if content_type.startswith('image/'):
-                return True
-        except requests.exceptions.Timeout:
-            # Zaman aşımı durumunda, URL'nin görünümüne göre karar ver
-            # Yaygın görsel sunucularını kontrol et
-            if any(host in parsed.netloc.lower() for host in ['img', 'image', 'photo', 'pic', 'cdn', 'media', 'iasbh', 'isbh']):
-                logger.warning(f"Zaman aşımı oluştu ancak URL görsel sunucusuna benziyor, geçerli kabul ediliyor: {url}")
-                return True
-            
-            # URL'de görsel uzantısı benzeri bir yapı var mı kontrol et
-            if re.search(r'\.(jpe?g|png|gif|webp)', parsed.path.lower()):
-                logger.warning(f"Zaman aşımı oluştu ancak URL görsel uzantısı içeriyor, geçerli kabul ediliyor: {url}")
-                return True
-            
-            # Yine de geçersiz kabul et
-            return False
-        
-        return False
     
-    except Exception as e:
-        logger.error(f"Görsel URL'si kontrol edilirken hata oluştu: {url} - {str(e)}")
-        
-        # Hata durumunda, URL'nin görünümüne göre karar ver
-        try:
-            parsed = urlparse(url)
-            # Yaygın görsel sunucularını kontrol et
-            if any(host in parsed.netloc.lower() for host in ['img', 'image', 'photo', 'pic', 'cdn', 'media', 'iasbh', 'isbh']):
-                logger.warning(f"Hata oluştu ancak URL görsel sunucusuna benziyor, geçerli kabul ediliyor: {url}")
-                return True
-            
-            # URL'de görsel uzantısı benzeri bir yapı var mı kontrol et
-            if re.search(r'\.(jpe?g|png|gif|webp)', parsed.path.lower()):
-                logger.warning(f"Hata oluştu ancak URL görsel uzantısı içeriyor, geçerli kabul ediliyor: {url}")
-                return True
-        except:
-            pass
-        
-        return False
+    # Habertürk küçük görselleri için özel işlem
+    if 'im.haberturk.com' in url and '_htufak.jpg' in url:
+        # Küçük görsel URL'sini büyük görsel URL'sine dönüştür
+        url = url.replace('_htufak.jpg', '.jpg')
+        logger.info(f"Habertürk küçük görsel büyük görsele dönüştürüldü: {url}")
+    
+    return True
 
 def gorsel_indir(url, dosya_yolu):
-    """Verilen URL'den görseli indirir ve belirtilen dosya yoluna kaydeder"""
+    """Belirtilen URL'den görseli indirir ve belirtilen dosya yoluna kaydeder."""
     try:
-        # Klasörün var olduğundan emin ol
+        # Dosya yolunun dizininin var olduğundan emin ol
         os.makedirs(os.path.dirname(dosya_yolu), exist_ok=True)
         
-        # Görseli indir
-        response = requests.get(url, stream=True, timeout=15)  # Zaman aşımını artırdık
-        response.raise_for_status()
+        # Habertürk küçük görselleri için özel işlem
+        if 'im.haberturk.com' in url and '_htufak.jpg' in url:
+            # Küçük görsel URL'sini büyük görsel URL'sine dönüştür
+            url = url.replace('_htufak.jpg', '.jpg')
+            logger.info(f"Habertürk küçük görsel büyük görsele dönüştürüldü: {url}")
         
-        # Dosyaya kaydet
-        with open(dosya_yolu, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+        # Görsel indirme işlemi
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, stream=True, timeout=15)
         
-        return True
-        
+        if response.status_code == 200:
+            with open(dosya_yolu, 'wb') as f:
+                for chunk in response.iter_content(1024):
+                    f.write(chunk)
+            return True
+        else:
+            logger.error(f"Görsel indirilirken hata oluştu: {url} - {response.status_code} {response.reason}")
+            return False
     except Exception as e:
         logger.error(f"Görsel indirilirken hata oluştu: {url} - {str(e)}")
         return False

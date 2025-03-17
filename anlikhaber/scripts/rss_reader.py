@@ -225,11 +225,29 @@ def gorsel_url_cek(entry, feed_url):
     
     return None
 
-def haberleri_cek():
-    """Tüm RSS kaynaklarından haberleri çeker ve veritabanına kaydeder"""
+def haberleri_cek(kaynak=None, limit=5):
+    """RSS kaynaklarından haberleri çeker ve veritabanına kaydeder
+    
+    Args:
+        kaynak (str, optional): Belirli bir kaynak adı. None ise tüm kaynaklar kullanılır.
+        limit (int, optional): Her kaynaktan çekilecek maksimum haber sayısı. Varsayılan 5.
+    
+    Returns:
+        int: Eklenen toplam haber sayısı
+    """
     toplam_eklenen = 0
     
-    for kaynak_adi, feed_url in RSS_FEEDS.items():
+    # Eğer belirli bir kaynak belirtilmişse, sadece o kaynağı kullan
+    if kaynak:
+        if kaynak in RSS_FEEDS:
+            kaynaklar = {kaynak: RSS_FEEDS[kaynak]}
+        else:
+            logger.warning(f"{kaynak} geçerli bir kaynak değil.")
+            return 0
+    else:
+        kaynaklar = RSS_FEEDS
+    
+    for kaynak_adi, feed_url in kaynaklar.items():
         logger.info(f"{kaynak_adi} kaynağından haberler çekiliyor...")
         
         try:
@@ -239,7 +257,7 @@ def haberleri_cek():
                 logger.warning(f"{kaynak_adi} için hiç haber bulunamadı.")
                 continue
             
-            for entry in feed.entries[:5]:  # Her kaynaktan 5 haber al
+            for entry in feed.entries[:limit]:  # Belirtilen sayıda haber al
                 try:
                     # Haber URL'si
                     if not hasattr(entry, 'link'):

@@ -6,12 +6,15 @@ from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 import threading
 from datetime import datetime
+import sys
+from werkzeug.middleware.proxy_fix import ProxyFix
 
-# .env dosyasını yükle
-load_dotenv()
+# Ana dizini ekleyelim
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Modelleri içe aktar
 from models import db, Haber, Ayarlar
+from scripts.image_processor import islenmemis_haberleri_isle, haber_gorselini_isle
 
 # Loglama ayarları
 logging.basicConfig(
@@ -35,6 +38,10 @@ def create_app():
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'gizli-anahtar-degistir')
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'anlikhaber.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    
+    # ProxyFix ekleyelim
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     
     # Veritabanını başlat
     db.init_app(app)
@@ -43,7 +50,7 @@ def create_app():
     os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'), exist_ok=True)
     os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs'), exist_ok=True)
     os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'images', 'processed'), exist_ok=True)
-    os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'fonts'), exist_ok=True)
+    os.makedirs(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'images', 'original'), exist_ok=True)
     
     # Veritabanını oluştur
     with app.app_context():
@@ -70,6 +77,10 @@ def create_app():
         
         db.session.commit()
     
+    # Blueprint'leri kaydet
+    from routes.haber_routes import haber_bp
+    app.register_blueprint(haber_bp, url_prefix='/haber')
+    
     # Ana sayfa
     @app.route('/')
     def index():
@@ -92,60 +103,84 @@ def create_app():
     # Haber detay sayfası
     @app.route('/haber/<int:haber_id>')
     def haber_detay(haber_id):
-        haber = Haber.query.get_or_404(haber_id)
-        return render_template('haber_detay.html', haber=haber, now=datetime.now())
+        try:
+            haber = Haber.query.get_or_404(haber_id)
+            return render_template('haber_detay.html', haber=haber, now=datetime.now())
+        except Exception as e:
+            logger.error(f"Haber detay sayfası yüklenirken hata oluştu: {str(e)}")
+            flash(f'Haber detay sayfası yüklenirken hata oluştu: {str(e)}', 'danger')
+            return redirect(url_for('haberler'))
     
     # Haberleri çek
-    @app.route('/haberleri-cek', methods=['POST'])
-    def haberleri_cek():
-        try:
-            from scripts.rss_reader import haberleri_cek as cek
-            
-            # Arka planda çalıştır
-            def arka_planda_cek():
+    @app.route('/haberleri-cek', methods=['GET', 'POST'])
+    def haberleri_cek_route():
+        if request.method == 'POST':
+            try:
+                # RSS okuyucuyu kullanarak haberleri çek
+                from scripts.rss_reader import haberleri_cek
+                
                 with app.app_context():
-                    yeni_haber_sayisi = cek()
-                    logger.info(f"Toplam {yeni_haber_sayisi} yeni haber eklendi.")
-            
-            thread = threading.Thread(target=arka_planda_cek)
-            thread.daemon = True
-            thread.start()
-            
-            flash('Haberler çekiliyor...', 'info')
-            return redirect(url_for('haberler'))
+                    yeni_haber_sayisi = haberleri_cek(limit=10)
+                    
+                if yeni_haber_sayisi > 0:
+                    flash(f'{yeni_haber_sayisi} yeni haber başarıyla çekildi.', 'success')
+                else:
+                    flash('Yeni haber bulunamadı.', 'info')
+                
+                return redirect(url_for('haberler'))
+            except Exception as e:
+                logger.error(f"Haberler çekilirken hata oluştu: {str(e)}")
+                flash(f'Haberler çekilirken hata oluştu: {str(e)}', 'danger')
+                return redirect(url_for('haberler'))
         
-        except Exception as e:
-            logger.error(f"Haberler çekilirken hata oluştu: {str(e)}")
-            flash(f'Hata: {str(e)}', 'danger')
-            return redirect(url_for('haberler'))
+        return render_template('haberleri_cek.html', now=datetime.now())
     
-    # Haberi özetle
-    @app.route('/haber-ozetle/<int:haber_id>', methods=['POST'])
-    def haber_ozetle(haber_id):
-        try:
-            from scripts.ai_summarizer import haber_ozetle
+    # İşlenmemiş görselleri işle
+    @app.route('/islenmemis-gorselleri-isle', methods=['GET', 'POST'])
+    def islenmemis_gorselleri_isle_route():
+        if request.method == 'POST':
+            try:
+                islenen_gorsel_sayisi = islenmemis_haberleri_isle()
+                flash(f'{islenen_gorsel_sayisi} haber görseli işlendi.', 'success')
+            except Exception as e:
+                logger.error(f"Görseller işlenirken hata oluştu: {str(e)}")
+                flash(f'Görseller işlenirken hata oluştu: {str(e)}', 'danger')
             
-            haber = Haber.query.get_or_404(haber_id)
-            
-            # Arka planda çalıştır
-            def arka_planda_ozetle(haber):
-                with app.app_context():
-                    ozet = haber_ozetle(haber.icerik, haber.baslik)
-                    haber.ozet = ozet
-                    db.session.commit()
-                    logger.info(f"Haber özetlendi: {haber.baslik}")
-            
-            thread = threading.Thread(target=arka_planda_ozetle, args=(haber,))
-            thread.daemon = True
-            thread.start()
-            
-            flash('Haber özetleniyor...', 'info')
-            return redirect(url_for('haber_detay', haber_id=haber_id))
+            return redirect(url_for('haberler'))
         
-        except Exception as e:
-            logger.error(f"Haber özetlenirken hata oluştu: {str(e)}")
-            flash(f'Hata: {str(e)}', 'danger')
-            return redirect(url_for('haber_detay', haber_id=haber_id))
+        return render_template('islenmemis_gorselleri_isle.html')
+    
+    # Özetsiz haberleri özetle
+    @app.route('/ozetsiz-haberleri-ozetle', methods=['GET', 'POST'])
+    def ozetsiz_haberleri_ozetle_route():
+        if request.method == 'POST':
+            try:
+                # Eksik modül olduğu için şimdilik devre dışı bırakalım
+                # ozetsiz_haberler = Haber.query.filter(
+                #     (Haber.ozet.is_(None)) | (Haber.ozet == '')
+                # ).all()
+                # 
+                # ozetlenen_haber_sayisi = 0
+                # 
+                # for haber in ozetsiz_haberler:
+                #     try:
+                #         ozet = haberi_ozetle(haber.icerik)
+                #         if ozet:
+                #             haber.ozet = ozet
+                #             db.session.commit()
+                #             ozetlenen_haber_sayisi += 1
+                #     except Exception as e:
+                #         logger.error(f"Haber özetlenirken hata oluştu (ID: {haber.id}): {str(e)}")
+                # 
+                # flash(f'{ozetlenen_haber_sayisi} haber özetlendi.', 'success')
+                flash('Bu özellik şu anda kullanılamıyor.', 'warning')
+            except Exception as e:
+                logger.error(f"Haberler özetlenirken genel hata oluştu: {str(e)}")
+                flash(f'Haberler özetlenirken hata oluştu: {str(e)}', 'danger')
+            
+            return redirect(url_for('haberler'))
+        
+        return render_template('ozetsiz_haberleri_ozetle.html')
     
     # Haber görseli bul
     @app.route('/haber-gorsel-bul/<int:haber_id>', methods=['POST'])
@@ -227,23 +262,23 @@ def create_app():
             
             logger.info(f"Haber ID {haber_id} için odak noktası ayarlanıyor: X={odak_x}, Y={odak_y}")
             
-            def arka_planda_gorsel_odakla(haber_id, odak_x, odak_y):
-                from scripts.image_processor import haber_gorselini_isle
-                with app.app_context():
-                    islenmis_gorsel_path = haber_gorselini_isle(haber_id, odak_x=odak_x, odak_y=odak_y, force_reprocess=True)
-                    if islenmis_gorsel_path:
-                        logger.info(f"Haber görseli odak noktası ile işleme sonucu: {islenmis_gorsel_path}")
-                    else:
-                        logger.error(f"Haber görseli odak noktası ile işlenemedi: ID {haber_id}")
+            # Görsel işleme işlemini doğrudan çağır
+            from scripts.image_processor import haber_gorselini_isle
+            islenmis_gorsel_path = haber_gorselini_isle(haber_id, odak_x=odak_x, odak_y=odak_y, force_reprocess=True)
             
-            thread = threading.Thread(target=arka_planda_gorsel_odakla, args=(haber_id, odak_x, odak_y))
-            thread.daemon = True
-            thread.start()
-            
-            return jsonify({
-                'success': True,
-                'message': 'Görsel işleniyor...'
-            })
+            if islenmis_gorsel_path:
+                logger.info(f"Haber görseli odak noktası ile işleme sonucu: {islenmis_gorsel_path}")
+                return jsonify({
+                    'success': True,
+                    'message': 'Görsel başarıyla işlendi',
+                    'islenmis_gorsel_path': islenmis_gorsel_path
+                })
+            else:
+                logger.error(f"Haber görseli odak noktası ile işlenemedi: ID {haber_id}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Görsel işlenemedi'
+                }), 500
             
         except Exception as e:
             logger.error(f"Haber görseli odak noktası ile işlenirken hata oluştu: {str(e)}")
@@ -561,22 +596,37 @@ def create_app():
             page = request.args.get('page', 1, type=int)
             per_page = request.args.get('per_page', 10, type=int)
             
-            # per_page=0 durumunu kontrol et
-            if per_page <= 0:
-                return jsonify({
-                    'haberler': [],
-                    'toplam': 0,
-                    'sayfa': 1,
-                    'toplam_sayfa': 0
+            # Maksimum per_page değeri
+            if per_page > 100:
+                per_page = 100
+            
+            haberler_query = Haber.query.order_by(Haber.olusturulma_zamani.desc())
+            
+            # Toplam haber sayısı
+            total = haberler_query.count()
+            
+            # Sayfalama
+            haberler_paginated = haberler_query.paginate(page=page, per_page=per_page)
+            
+            # Haberleri JSON formatına dönüştür
+            haberler_list = []
+            for haber in haberler_paginated.items:
+                haberler_list.append({
+                    'id': haber.id,
+                    'baslik': haber.baslik,
+                    'ozet': haber.ozet,
+                    'kaynak': haber.kaynak,
+                    'tarih': haber.olusturulma_zamani.isoformat() if haber.olusturulma_zamani else None,
+                    'gorsel_url': haber.gorsel_url,
+                    'islenmis_gorsel_path': haber.islenmis_gorsel_path
                 })
             
-            haberler = Haber.query.order_by(Haber.olusturulma_zamani.desc()).paginate(page=page, per_page=per_page)
-            
             return jsonify({
-                'haberler': [haber.to_dict() for haber in haberler.items],
-                'toplam': haberler.total,
-                'sayfa': haberler.page,
-                'toplam_sayfa': haberler.pages
+                'haberler': haberler_list,
+                'toplam': total,
+                'sayfa': page,
+                'sayfa_basina': per_page,
+                'toplam_sayfa': haberler_paginated.pages
             })
         
         except Exception as e:
@@ -593,6 +643,65 @@ def create_app():
         except Exception as e:
             logger.error(f"API haber detayı alınırken hata oluştu: {str(e)}")
             return jsonify({'error': str(e)}), 500
+    
+    # Haber görselini kırp
+    @app.route('/haber-gorselini-kirp/<int:haber_id>', methods=['POST'])
+    def haber_gorselini_kirp_route(haber_id):
+        """Haber görselini kırparak işle"""
+        try:
+            # Haberi al
+            haber = Haber.query.get_or_404(haber_id)
+            
+            # Görsel URL'si veya orijinal görsel yolu yoksa hata döndür
+            if not haber.gorsel_url and not haber.orijinal_gorsel_path:
+                return jsonify({"success": False, "message": "Haber görseli bulunamadı"}), 404
+            
+            # Kırpma parametrelerini al
+            crop_x = request.form.get('cropX', 0, type=int)
+            crop_y = request.form.get('cropY', 0, type=int)
+            crop_width = request.form.get('cropWidth', 300, type=int)
+            crop_height = request.form.get('cropHeight', 300, type=int)
+            
+            # Parametreleri logla
+            app.logger.info(f"Kırpma parametreleri: X={crop_x}, Y={crop_y}, Genişlik={crop_width}, Yükseklik={crop_height}")
+            
+            # Görseli kırp ve işle
+            from scripts.image_processor import haber_gorselini_kirp
+            islenmis_gorsel_path = haber_gorselini_kirp(haber_id, crop_x, crop_y, crop_width, crop_height)
+            
+            if islenmis_gorsel_path:
+                return jsonify({"success": True, "message": "Görsel başarıyla işlendi", "path": islenmis_gorsel_path})
+            else:
+                return jsonify({"success": False, "message": "Görsel işlenirken hata oluştu"}), 500
+        
+        except Exception as e:
+            app.logger.error(f"Haber görseli kırpılırken hata oluştu: {str(e)}")
+            return jsonify({"success": False, "message": f"Hata: {str(e)}"}), 500
+    
+    @app.route('/ozet-guncelle/<int:haber_id>', methods=['POST'])
+    def ozet_guncelle(haber_id):
+        """Haber özetini güncelle"""
+        try:
+            # Haberi al
+            haber = Haber.query.get_or_404(haber_id)
+            
+            # Yeni özeti al
+            yeni_ozet = request.form.get('ozet', '')
+            
+            # Özeti güncelle
+            haber.ozet = yeni_ozet
+            db.session.commit()
+            
+            app.logger.info(f"Haber ID {haber_id} için özet güncellendi")
+            
+            # Başarılı mesajıyla haber detay sayfasına yönlendir
+            flash('Özet başarıyla güncellendi', 'success')
+            return redirect(url_for('haber_detay', haber_id=haber_id))
+        
+        except Exception as e:
+            app.logger.error(f"Özet güncellenirken hata oluştu: {str(e)}")
+            flash(f'Özet güncellenirken hata oluştu: {str(e)}', 'danger')
+            return redirect(url_for('haber_detay', haber_id=haber_id))
     
     return app
 
