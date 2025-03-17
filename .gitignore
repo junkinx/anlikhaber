@@ -107,3 +107,11 @@ anlikhaber/logs/*
 !anlikhaber/static/images/processed/.gitkeep
 !anlikhaber/static/images/original/.gitkeep
 !anlikhaber/logs/.gitkeep 
+# Geçici dosyalar
+temp_fonts/
+temp_rubik/
+anlikhaber/static/fonts/css2
+anlikhaber/static/fonts/rubik.zip
+
+# Veritabanı
+anlikhaber/data/anlikhaber.db
