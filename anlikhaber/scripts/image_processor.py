@@ -315,7 +315,7 @@ def gorsel_url_isle(gorsel_url, baslik, kaynak=None, odak_x=None, odak_y=None, h
                 
                 # Kaynak bilgisini en alta ekle
                 kaynak_y = INSTAGRAM_YUKSEKLIK - 100  # Alt kenardan 100px yukarıda (50px yerine)
-                draw.text((100, kaynak_y), kaynak_text, font=kaynak_font, fill=(200, 200, 200))
+                draw.text((100, kaynak_y), kaynak_text, font=kaynak_font, fill=(150, 150, 150))
                 logger.info("Kaynak bilgisi eklendi")
                 
             except Exception as e:
@@ -718,7 +718,7 @@ def haber_gorselini_kirp(haber_id, crop_x, crop_y, crop_width, crop_height):
                     
                     # Kaynak bilgisini en alta ekle
                     kaynak_y = INSTAGRAM_YUKSEKLIK - 100  # Alt kenardan 100px yukarıda (50px yerine)
-                    draw.text((100, kaynak_y), kaynak_text, font=kaynak_font, fill=(200, 200, 200))
+                    draw.text((100, kaynak_y), kaynak_text, font=kaynak_font, fill=(150, 150, 150))
                     logger.info("Kaynak bilgisi eklendi")
                     
                 except Exception as e:
