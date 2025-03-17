@@ -186,11 +186,11 @@ def gorsel_url_isle(gorsel_url, baslik, kaynak=None, odak_x=None, odak_y=None, h
         logger.info("ImageDraw nesnesi oluşturuldu")
         
         # Font dosyalarını kontrol et ve yükle
-        rubik_semibold_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Rubik-SemiBold.ttf')
+        raleway_bold_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Rubik-SemiBold.ttf')
         raleway_thin_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Raleway-Thin.ttf')
         
-        logger.info(f"Rubik SemiBold font dosyası yolu: {rubik_semibold_path}")
-        logger.info(f"Rubik SemiBold font dosyası mevcut mu: {os.path.exists(rubik_semibold_path)}")
+        logger.info(f"Rubik SemiBold font dosyası yolu: {raleway_bold_path}")
+        logger.info(f"Rubik SemiBold font dosyası mevcut mu: {os.path.exists(raleway_bold_path)}")
         logger.info(f"Raleway Thin font dosyası yolu: {raleway_thin_path}")
         logger.info(f"Raleway Thin font dosyası mevcut mu: {os.path.exists(raleway_thin_path)}")
         
@@ -208,8 +208,8 @@ def gorsel_url_isle(gorsel_url, baslik, kaynak=None, odak_x=None, odak_y=None, h
             
             # Özet metni için font
             ozet_font_size = 40
-            ozet_font = ImageFont.truetype(rubik_semibold_path, ozet_font_size) if os.path.exists(rubik_semibold_path) else ImageFont.load_default()
-            logger.info(f"Özet font yüklendi: {'Rubik-SemiBold' if os.path.exists(rubik_semibold_path) else 'Default'}, boyut: {ozet_font_size}")
+            ozet_font = ImageFont.truetype(raleway_bold_path, ozet_font_size) if os.path.exists(raleway_bold_path) else ImageFont.load_default()
+            logger.info(f"Özet font yüklendi: {'Rubik-SemiBold' if os.path.exists(raleway_bold_path) else 'Default'}, boyut: {ozet_font_size}")
             
             # Kaynak ve tarih için font
             kaynak_font_size = 30
@@ -589,11 +589,11 @@ def haber_gorselini_kirp(haber_id, crop_x, crop_y, crop_width, crop_height):
             logger.info("ImageDraw nesnesi oluşturuldu")
             
             # Font dosyalarını kontrol et ve yükle
-            rubik_semibold_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Rubik-SemiBold.ttf')
+            raleway_bold_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Rubik-SemiBold.ttf')
             raleway_thin_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Raleway-Thin.ttf')
             
-            logger.info(f"Rubik SemiBold font dosyası yolu: {rubik_semibold_path}")
-            logger.info(f"Rubik SemiBold font dosyası mevcut mu: {os.path.exists(rubik_semibold_path)}")
+            logger.info(f"Rubik SemiBold font dosyası yolu: {raleway_bold_path}")
+            logger.info(f"Rubik SemiBold font dosyası mevcut mu: {os.path.exists(raleway_bold_path)}")
             logger.info(f"Raleway Thin font dosyası yolu: {raleway_thin_path}")
             logger.info(f"Raleway Thin font dosyası mevcut mu: {os.path.exists(raleway_thin_path)}")
             
@@ -611,8 +611,8 @@ def haber_gorselini_kirp(haber_id, crop_x, crop_y, crop_width, crop_height):
                 
                 # Özet metni için font
                 ozet_font_size = 40
-                ozet_font = ImageFont.truetype(rubik_semibold_path, ozet_font_size) if os.path.exists(rubik_semibold_path) else ImageFont.load_default()
-                logger.info(f"Özet font yüklendi: {'Rubik-SemiBold' if os.path.exists(rubik_semibold_path) else 'Default'}, boyut: {ozet_font_size}")
+                ozet_font = ImageFont.truetype(raleway_bold_path, ozet_font_size) if os.path.exists(raleway_bold_path) else ImageFont.load_default()
+                logger.info(f"Özet font yüklendi: {'Rubik-SemiBold' if os.path.exists(raleway_bold_path) else 'Default'}, boyut: {ozet_font_size}")
                 
                 # Kaynak ve tarih için font
                 kaynak_font_size = 30
