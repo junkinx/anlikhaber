@@ -187,12 +187,12 @@ def gorsel_url_isle(gorsel_url, baslik, kaynak=None, odak_x=None, odak_y=None, h
         
         # Font dosyalarını kontrol et ve yükle
         raleway_bold_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Rubik-SemiBold.ttf')
-        raleway_thin_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Raleway-Thin.ttf')
+        raleway_thin_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Rubik-Light.ttf')
         
         logger.info(f"Rubik SemiBold font dosyası yolu: {raleway_bold_path}")
         logger.info(f"Rubik SemiBold font dosyası mevcut mu: {os.path.exists(raleway_bold_path)}")
-        logger.info(f"Raleway Thin font dosyası yolu: {raleway_thin_path}")
-        logger.info(f"Raleway Thin font dosyası mevcut mu: {os.path.exists(raleway_thin_path)}")
+        logger.info(f"Rubik Light font dosyası yolu: {raleway_thin_path}")
+        logger.info(f"Rubik Light font dosyası mevcut mu: {os.path.exists(raleway_thin_path)}")
         
         try:
             # Overlay görseli ekle
@@ -214,7 +214,7 @@ def gorsel_url_isle(gorsel_url, baslik, kaynak=None, odak_x=None, odak_y=None, h
             # Kaynak ve tarih için font
             kaynak_font_size = 30
             kaynak_font = ImageFont.truetype(raleway_thin_path, kaynak_font_size) if os.path.exists(raleway_thin_path) else ImageFont.load_default()
-            logger.info(f"Kaynak ve tarih font yüklendi: {'Raleway-Thin' if os.path.exists(raleway_thin_path) else 'Default'}, boyut: {kaynak_font_size}")
+            logger.info(f"Kaynak ve tarih font yüklendi: {'Rubik-Light' if os.path.exists(raleway_thin_path) else 'Default'}, boyut: {kaynak_font_size}")
             
             # Özet metnini ekle
             try:
@@ -590,12 +590,12 @@ def haber_gorselini_kirp(haber_id, crop_x, crop_y, crop_width, crop_height):
             
             # Font dosyalarını kontrol et ve yükle
             raleway_bold_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Rubik-SemiBold.ttf')
-            raleway_thin_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Raleway-Thin.ttf')
+            raleway_thin_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'fonts', 'Rubik-Light.ttf')
             
             logger.info(f"Rubik SemiBold font dosyası yolu: {raleway_bold_path}")
             logger.info(f"Rubik SemiBold font dosyası mevcut mu: {os.path.exists(raleway_bold_path)}")
-            logger.info(f"Raleway Thin font dosyası yolu: {raleway_thin_path}")
-            logger.info(f"Raleway Thin font dosyası mevcut mu: {os.path.exists(raleway_thin_path)}")
+            logger.info(f"Rubik Light font dosyası yolu: {raleway_thin_path}")
+            logger.info(f"Rubik Light font dosyası mevcut mu: {os.path.exists(raleway_thin_path)}")
             
             try:
                 # Overlay görseli ekle
@@ -617,7 +617,7 @@ def haber_gorselini_kirp(haber_id, crop_x, crop_y, crop_width, crop_height):
                 # Kaynak ve tarih için font
                 kaynak_font_size = 30
                 kaynak_font = ImageFont.truetype(raleway_thin_path, kaynak_font_size) if os.path.exists(raleway_thin_path) else ImageFont.load_default()
-                logger.info(f"Kaynak ve tarih font yüklendi: {'Raleway-Thin' if os.path.exists(raleway_thin_path) else 'Default'}, boyut: {kaynak_font_size}")
+                logger.info(f"Kaynak ve tarih font yüklendi: {'Rubik-Light' if os.path.exists(raleway_thin_path) else 'Default'}, boyut: {kaynak_font_size}")
                 
                 # Özet metnini ekle
                 try:
