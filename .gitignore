@@ -115,3 +115,17 @@ anlikhaber/static/fonts/rubik.zip
 
 # Veritabanı
 anlikhaber/data/anlikhaber.db
+
+# Arşiv ve yedekler
+backup/
+archive/
+
+# İşlenmiş görseller (veritabanından referans edilenler hariç)
+# anlikhaber/static/images/processed/*.jpg
+# anlikhaber/static/images/processed/*.png
+# !anlikhaber/static/images/processed/.gitkeep
+
+# Orijinal görseller (veritabanından referans edilenler hariç)
+# anlikhaber/static/images/original/*.jpg
+# anlikhaber/static/images/original/*.png
+# !anlikhaber/static/images/original/.gitkeep

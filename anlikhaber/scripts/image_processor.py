@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import db, Haber
 from scripts.image_finder import gorsel_indir, gorsel_url_gecerli_mi
+from scripts.openai_utils import haber_ozetle, hashtag_olustur
 
 # Loglama ayarları
 logging.basicConfig(
@@ -354,59 +355,55 @@ def gorsel_url_isle(gorsel_url, baslik, kaynak=None, odak_x=None, odak_y=None, h
         return None
 
 def islenmemis_haberleri_isle():
-    """Veritabanındaki işlenmemiş görselleri olan haberleri işler"""
+    """
+    Veritabanındaki işlenmemiş görselleri işler
+    """
     try:
-        # İşlenmemiş görselleri olan haberleri al
-        islenmemis_haberler = Haber.query.filter(
-            Haber.gorsel_url.isnot(None),
-            (Haber.islenmis_gorsel_path.is_(None)) | (Haber.islenmis_gorsel_path == '')
+        haberler = Haber.query.filter(
+            (Haber.islenmis_gorsel_path.is_(None)) &
+            (Haber.gorsel_url.isnot(None)) &
+            (Haber.gorsel_url != '')
         ).all()
         
-        if not islenmemis_haberler:
+        if not haberler:
             logger.info("İşlenecek görsel bulunamadı.")
-            return 0
+            return "İşlenecek görsel bulunamadı."
         
-        islenen_gorsel_sayisi = 0
-        
-        for haber in islenmemis_haberler:
-            try:
-                logger.info(f"Haber görseli işleniyor: {haber.baslik}")
-                
-                # Eğer haberin özeti yoksa, örnek bir özet ekle
-                if not haber.ozet:
-                    logger.info(f"Haber ID {haber.id} için özet ekleniyor...")
+        sonuclar = []
+        for haber in haberler:
+            if not haber.ozet or haber.ozet == "":
+                # OpenAI ile özet oluştur
+                try:
+                    logger.info(f"Haber ID {haber.id} için OpenAI ile özet oluşturuluyor...")
+                    ozet = haber_ozetle(haber.icerik, haber.baslik)
+                    if ozet:
+                        haber.ozet = ozet
+                        db.session.commit()
+                        logger.info(f"Haber ID {haber.id} için özet oluşturuldu.")
+                    else:
+                        # Özet oluşturulamadıysa default bir özet ata
+                        haber.ozet = f"Bu haber için otomatik oluşturulmuş örnek bir özet metnidir. Gerçek özet, AI tarafından oluşturulacaktır. Haber başlığı: {haber.baslik}"
+                        db.session.commit()
+                        logger.info(f"Haber ID {haber.id} için default özet atandı.")
+                except Exception as e:
+                    logger.error(f"Özet oluşturma hatası: {str(e)}")
                     haber.ozet = f"Bu haber için otomatik oluşturulmuş örnek bir özet metnidir. Gerçek özet, AI tarafından oluşturulacaktır. Haber başlığı: {haber.baslik}"
                     db.session.commit()
-                    logger.info(f"Özet eklendi: {haber.ozet}")
-                
-                # Görsel URL'sini kontrol et
-                if not gorsel_url_gecerli_mi(haber.gorsel_url):
-                    logger.warning(f"Geçersiz görsel URL'si: {haber.gorsel_url}")
-                    continue
-                
-                # Görseli işle
-                sonuc = gorsel_url_isle(haber.gorsel_url, haber.baslik, haber.kaynak, haber=haber)
-                
-                if sonuc:
-                    # İşlenmiş görsel yolunu kaydet
-                    haber.islenmis_gorsel_path = sonuc["islenmis_gorsel_url"]
-                    haber.orijinal_gorsel_path = sonuc["orijinal_gorsel_url"]
-                    db.session.commit()
-                    
-                    islenen_gorsel_sayisi += 1
-                    logger.info(f"Haber görseli işlendi: {haber.baslik}")
-                else:
-                    logger.warning(f"Haber görseli işlenemedi: {haber.baslik}")
-                
+            
+            # Görseli işle
+            try:
+                sonuc = haber_gorselini_isle(haber.id)
+                sonuclar.append(f"ID: {haber.id}, Sonuç: {sonuc}")
             except Exception as e:
-                logger.error(f"Haber görseli işlenirken hata oluştu (ID: {haber.id}): {str(e)}")
-                db.session.rollback()
+                logger.error(f"Görsel işleme hatası (ID: {haber.id}): {str(e)}")
+                sonuclar.append(f"ID: {haber.id}, Hata: {str(e)}")
         
-        return islenen_gorsel_sayisi
-    
+        return "\n".join(sonuclar)
     except Exception as e:
-        logger.error(f"Haberler işlenirken genel hata oluştu: {str(e)}")
-        return 0
+        error_msg = f"İşlenmemiş haberleri işleme hatası: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        return error_msg
 
 def haber_gorselini_isle(haber_id, odak_x=None, odak_y=None, force_reprocess=False):
     """
