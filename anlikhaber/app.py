@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import threading
 from datetime import datetime
 import sys
+from flask_login import login_required
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Ana dizini ekleyelim
@@ -15,6 +16,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Modelleri içe aktar
 from models import db, Haber, Ayarlar
 from scripts.image_processor import islenmemis_haberleri_isle, haber_gorselini_isle
+from scripts.openai_utils import haber_ozetle, hashtag_olustur
+from scripts.instagram_poster import instagram_fotograf_paylas, paylasilmamis_haberleri_paylas
 
 # Loglama ayarları
 logging.basicConfig(
@@ -701,6 +704,72 @@ def create_app():
         except Exception as e:
             app.logger.error(f"Özet güncellenirken hata oluştu: {str(e)}")
             flash(f'Özet güncellenirken hata oluştu: {str(e)}', 'danger')
+            return redirect(url_for('haber_detay', haber_id=haber_id))
+    
+    @app.route('/haber-ai-ozetle/<int:haber_id>', methods=['POST'])
+    def haber_ai_ozetle(haber_id):
+        """
+        OpenAI API kullanarak haberi özetler
+        """
+        try:
+            # Haberi getir
+            haber = Haber.query.get_or_404(haber_id)
+            
+            # Özet oluştur
+            ozet = haber_ozetle(haber.icerik, haber.baslik)
+            
+            if not ozet:
+                flash("Özet oluşturulamadı. Lütfen OpenAI API anahtarınızı kontrol edin.", "error")
+                return redirect(url_for('haber_detay', haber_id=haber_id))
+            
+            # Özeti kaydet
+            haber.ozet = ozet
+            db.session.commit()
+            
+            # Görseli işle
+            sonuc = haber_gorselini_isle(haber_id, force_reprocess=True)
+            
+            if sonuc:
+                logger.info(f"Haber AI ile özetlendi ve görsel işlendi: {haber.baslik}")
+                flash("Haber AI ile özetlendi ve görsel işlendi.", "success")
+            else:
+                logger.warning(f"Haber AI ile özetlendi ancak görsel işlenemedi: {haber.baslik}")
+                flash("Haber AI ile özetlendi ancak görsel işlenemedi.", "warning")
+            
+            return redirect(url_for('haber_detay', haber_id=haber_id))
+        
+        except Exception as e:
+            logger.error(f"Haber AI ile özetlenirken hata oluştu: {str(e)}")
+            flash(f"Haber özetlenirken bir hata oluştu: {str(e)}", "error")
+            return redirect(url_for('haber_detay', haber_id=haber_id))
+    
+    @app.route('/instagram-paylas/<int:haber_id>', methods=['POST'])
+    def instagram_paylas(haber_id):
+        """
+        Haberi Instagram'da paylaşır
+        """
+        try:
+            # Haberi getir
+            haber = Haber.query.get_or_404(haber_id)
+            
+            # Paylaşıma hazır değilse hazır olarak işaretle
+            if not haber.paylasima_hazir:
+                haber.paylasima_hazir = True
+                db.session.commit()
+            
+            # Instagram'da paylaş
+            sonuc = instagram_fotograf_paylas(haber_id)
+            
+            if sonuc.get("success"):
+                flash(f"Haber başarıyla Instagram'da paylaşıldı. Post ID: {sonuc.get('post_id')}", "success")
+            else:
+                flash(f"Haber Instagram'da paylaşılamadı: {sonuc.get('error')}", "error")
+            
+            return redirect(url_for('haber_detay', haber_id=haber_id))
+        
+        except Exception as e:
+            logger.error(f"Haber Instagram'da paylaşılırken hata oluştu: {str(e)}")
+            flash(f"Haber paylaşılırken bir hata oluştu: {str(e)}", "error")
             return redirect(url_for('haber_detay', haber_id=haber_id))
     
     return app

@@ -231,6 +231,21 @@
                         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#ozetDuzenlemeForm" aria-expanded="false" aria-controls="ozetDuzenlemeForm">
                             Özeti Düzenle
                         </button>
+                        
+                        <!-- OpenAI ile Özetleme Butonu -->
+                        <form action="{{ url_for('haber_ai_ozetle', haber_id=haber.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-robot"></i> AI ile Özetle
+                            </button>
+                        </form>
+                        
+                        <!-- Instagram Paylaşım Butonu -->
+                        <form action="{{ url_for('instagram_paylas', haber_id=haber.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="fab fa-instagram"></i> Instagram'da Paylaş
+                            </button>
+                        </form>
+                        
                         <div class="collapse mt-2" id="ozetDuzenlemeForm">
                             <form action="{{ url_for('ozet_guncelle', haber_id=haber.id) }}" method="post">
                                 <div class="form-group">
@@ -243,47 +258,6 @@
                 </div>
             </div>
             
-            <!-- Test Metinleri Bölümü -->
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Test Metinleri</h5>
-                </div>
-                <div class="card-body">
-                    <p class="mb-2">Aşağıdaki test metinlerinden birini seçerek özet alanına kopyalayabilirsiniz:</p>
-                    
-                    <div class="form-group">
-                        <label for="testMetni1"><strong>5 Satırlık Test Metni:</strong></label>
-                        <textarea id="testMetni1" class="form-control mb-2" rows="5" readonly>Bu haber için otomatik oluşturulmuş 5 satırlık bir özet metnidir. Metinde satır sayısına göre pozisyonlama test edilmektedir. Beş satırlık metin için Y pozisyonu 1000px olarak ayarlanacaktır. Bu metin tam olarak beş satır olacak şekilde hazırlanmıştır. Son satır burada bitmektedir.</textarea>
-                        <button class="btn btn-sm btn-outline-primary mb-3" onclick="kopyalaVeYapistir('testMetni1')">Bu Metni Özete Kopyala</button>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="testMetni2"><strong>6 Satırlık Test Metni:</strong></label>
-                        <textarea id="testMetni2" class="form-control mb-2" rows="6" readonly>Bu haber için otomatik oluşturulmuş 6 satırlık bir özet metnidir. Metinde satır sayısına göre pozisyonlama test edilmektedir. Altı satırlık metin için Y pozisyonu 950px olarak ayarlanacaktır. Bu metin tam olarak altı satır olacak şekilde hazırlanmıştır. Beşinci satır burada devam etmektedir. Altıncı ve son satır burada bitmektedir.</textarea>
-                        <button class="btn btn-sm btn-outline-primary mb-3" onclick="kopyalaVeYapistir('testMetni2')">Bu Metni Özete Kopyala</button>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="testMetni3"><strong>7 Satırlık Test Metni:</strong></label>
-                        <textarea id="testMetni3" class="form-control mb-2" rows="7" readonly>Bu haber için otomatik oluşturulmuş 7 satırlık bir özet metnidir. Metinde satır sayısına göre pozisyonlama test edilmektedir. Yedi satırlık metin için Y pozisyonu 900px olarak ayarlanacaktır. Bu metin tam olarak yedi satır olacak şekilde hazırlanmıştır. Beşinci satır burada devam etmektedir. Altıncı satır da burada devam etmektedir. Yedinci ve son satır burada bitmektedir.</textarea>
-                        <button class="btn btn-sm btn-outline-primary mb-3" onclick="kopyalaVeYapistir('testMetni3')">Bu Metni Özete Kopyala</button>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="testMetni4"><strong>8 Satırlık Test Metni:</strong></label>
-                        <textarea id="testMetni4" class="form-control mb-2" rows="8" readonly>Bu haber için otomatik oluşturulmuş 8 satırlık bir özet metnidir. Metinde satır sayısına göre pozisyonlama test edilmektedir. Sekiz satırlık metin için Y pozisyonu 850px olarak ayarlanacaktır. Bu metin tam olarak sekiz satır olacak şekilde hazırlanmıştır. Beşinci satır burada devam etmektedir. Altıncı satır da burada devam etmektedir. Yedinci satır burada devam etmektedir. Sekizinci ve son satır burada bitmektedir.</textarea>
-                        <button class="btn btn-sm btn-outline-primary mb-3" onclick="kopyalaVeYapistir('testMetni4')">Bu Metni Özete Kopyala</button>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="testMetni5"><strong>10 Satırlık Test Metni:</strong></label>
-                        <textarea id="testMetni5" class="form-control mb-2" rows="10" readonly>Bu haber için otomatik oluşturulmuş 10 satırlık bir özet metnidir. Metinde satır sayısına göre pozisyonlama test edilmektedir. On satırlık metin için Y pozisyonu 850px olarak ayarlanacaktır. Bu metin tam olarak on satır olacak şekilde hazırlanmıştır. Beşinci satır burada devam etmektedir. Altıncı satır da burada devam etmektedir. Yedinci satır burada devam etmektedir. Sekizinci satır burada devam etmektedir. Dokuzuncu satır burada devam etmektedir. Onuncu ve son satır burada bitmektedir.</textarea>
-                        <button class="btn btn-sm btn-outline-primary mb-3" onclick="kopyalaVeYapistir('testMetni5')">Bu Metni Özete Kopyala</button>
-                    </div>
-                </div>
-            </div>
-            <!-- Test Metinleri Bölümü Sonu -->
-            
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">İçerik</h5>
@@ -293,6 +267,11 @@
             
             <div class="mt-4">
                 <a href="{{ url_for('haberler') }}" class="btn btn-secondary">Tüm Haberler</a>
+                {% if haber.url %}
+                <a href="{{ haber.url }}" target="_blank" class="btn btn-primary">
+                    <i class="fas fa-external-link-alt"></i> Orijinal Habere Git
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -772,14 +751,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-
-// Test metinlerini kopyalama fonksiyonu
-function kopyalaVeYapistir(elementId) {
-    const testMetni = document.getElementById(elementId).value;
-    document.getElementById('ozet').value = testMetni;
-    
-    // Kullanıcıya bilgi ver
-    alert('Test metni özet alanına kopyalandı. Şimdi "Özeti Kaydet" butonuna tıklayarak özeti kaydedebilirsiniz.');
-}
 </script>
 {% endblock %} 

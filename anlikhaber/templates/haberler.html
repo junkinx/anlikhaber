@@ -91,6 +91,11 @@
                                         </button>
                                     </form>
                                 {% endif %}
+                                {% if haber.url %}
+                                    <a href="{{ haber.url }}" target="_blank" class="btn btn-outline-primary" title="Orijinal Habere Git">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
